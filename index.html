@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title></title>
+	<link rel="stylesheet" href="highlight/styles/default.css">
+	<!-- <script src="highlight/highlight.pack.js"></script>
+	<script>hljs.initHighlightingOnLoad();</script> -->
+	<link href="https://fonts.googleapis.com/css?family=Roboto+Condensed:300,400,700&display=swap" rel="stylesheet">
+	<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+	<!-- <script src="https://kit.fontawesome.com/25d307a19a.js" crossorigin="anonymous"></script> -->
+	<style type="text/css">
+		#mainCols{
+			display: flex;
+			flex-wrap: nowrap;
+		}
+
+		#nav{
+			display: flex;
+			align-items: stretch;
+		}
+
+		div, iframe, pre{
+			box-sizing: border-box;
+		}
+
+		#studentCol{
+			width: 10%;
+		}
+
+			#studentCol div{
+				padding: .5em
+			}
+
+			#studentCol div:hover{
+				cursor: pointer;
+				background: dodgerblue;
+				color: white;
+			}
+
+			.selectedStudent{
+				background: dodgerblue;
+				color: white;
+			}
+
+		#infoCol{
+			width: 90%;
+			padding: 1em;
+		}
+
+		#testerCol{
+			width: 45%;
+		}
+			#testerCol iframe, #codeCol pre{
+				width: 100%;
+				border: none;
+				border-bottom: 1px solid dodgerblue;
+				height: 500px;
+				margin: 0;
+				padding: .5em;
+				overflow: scroll;
+				display:block;
+			}
+		#codeCol{
+			width: 45%;
+		}
+		#fileNav{
+			display: flex;
+			flex-wrap: nowrap;
+			justify-content: space-around;
+		}
+			#fileNav > div{
+				padding: .5em;
+			}
+			#fileNav > div:hover{
+				text-decoration: underline;
+				cursor: pointer;
+			}
+
+		/*iframe{
+			transform: scale(0.75);
+		}*/
+
+		table.diff {font-family:Courier; border:medium;}
+        .diff_header {background-color:#e0e0e0}
+        td.diff_header {text-align:right}
+        .diff_next {background-color:#c0c0c0}
+        .diff_add {background-color:#aaffaa}
+        .diff_chg {background-color:#ffff77}
+        .diff_sub {background-color:#ffaaaa}
+	</style>
+</head>
+<body>
+
+	<div id="mainContain">
+		<div style="display: flex; justify-content: space-between;">
+			<h1>Grader</h1>
+			<input v-model="hwDir"/>
+			<div>Names Need Reformatting: <input type="checkbox"></div>
+		</div>
+		
+		<div id="nav">
+			<div style="width: 10%"><button v-on:click="save()">Save</button></div>
+			<div style="width: 90%; display: flex; align-items: flex-start;">
+				<input id="studentGrade" v-model="selectedStudent.grade" placeholder="grade" style="width: 15%;" />
+				<textarea id="studentComments" v-model="selectedStudent.comments" placeholder="comments" style="width: 70%; margin-left: 5%;"></textarea>
+			</div>
+		</div>
+		<div id="mainCols">
+			<div id="studentCol">
+				<div v-for="student in students" v-on:click="selectStudent(student)" v-bind:class="{selectedStudent: selectedStudent.dir == student.dir}">
+					{{student.dir}}
+				</div>
+			</div>
+			<div id="infoCol">
+				<div id="fileNav">
+					<div v-for="file in selectedStudent.files" v-on:click="selectFile(file)" v-bind:class="{selectedStudent: selectedStudent.selectedFile.py.name == file.py.name}">{{file.py.name}}</div>
+				</div>
+
+				<div v-if="selectedStudent.selectedFile.rtf" v-html="selectedStudent.selectedFile.rtf.html"></div>
+				<div v-if="selectedStudent.selectedFile.grader" v-html="selectedStudent.selectedFile.grader.html"></div>
+				<pre v-if="selectedStudent.selectedFile.py" v-html="selectedStudent.selectedFile.py.html"></pre>
+			</div>
+			<!-- <div id="testerCol">
+				
+			</div>
+			<div id="codeCol">
+				
+			</div> -->
+		</div>
+	</div>
+
+	<script src="https://unpkg.com/vue"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.9.1/underscore-min.js"></script>
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+	<script type="text/javascript">
+		
+		var dat;
+
+		var V = new Vue({
+			el: '#mainContain',
+			data: {
+				hwDir: '/Users/ndiana/Documents/Classes/Fall2020/COSC101L/grading/prelab4',
+				outputDir: 'output',
+				students: [],
+				selectedStudent: {
+					grade: 'NONE',
+					comments: "No student selected",
+					files: [],
+					selectedFile: {
+						py: {name: "", html: ""},
+						grader: {name: "", html: ""},
+						rtf: {name: "", html: ""}
+					}
+				},
+				namesNeedReformatting: false
+			},
+			computed: {
+
+			},
+			mounted(){
+		        this._keyListener = function(e) {
+		            if (e.key === "s" && (e.ctrlKey || e.metaKey)) {
+		                e.preventDefault(); // present "Save Page" from getting triggered.
+		                console.log(e);
+		                V.save();
+		            }
+
+		            if (e.key === "Tab") {
+	            		e.preventDefault();
+	            		if (document.activeElement.id == 'studentGrade'){
+	            			document.getElementById('studentComments').focus();
+	            		}
+	            		else if (document.activeElement.id == 'studentComments'){
+	            			document.getElementById('studentGrade').focus();
+	            		}
+	            		else{
+	            			document.getElementById('studentGrade').focus();
+	            		}
+		            }
+
+		            if (document.getElementById('studentComments') === document.activeElement){
+		            	if (e.key === "Escape") {
+		            		e.preventDefault();
+		            		document.activeElement.blur();
+			            }
+		            	return;
+		            }
+
+		            if (e.key === "ArrowRight") {
+		                console.log("NEXT FILE");
+		                e.preventDefault();
+		                V.nextFile()
+		            }
+		            if (e.key === "ArrowLeft") {
+		                console.log("PREV FILE");
+		                e.preventDefault();
+		                V.prevFile();
+		            }
+		            if (e.key === "ArrowUp") {
+		                console.log("PREV STUDENT");
+		                e.preventDefault();
+		                V.prevStudent();
+		            }
+		            if (e.key === "ArrowDown") {
+		                console.log("NEXT STUDENT");
+		                e.preventDefault();
+		                V.nextStudent();
+		            }
+		        };
+
+		        document.addEventListener('keydown', this._keyListener.bind(this));
+		    },
+			methods: {
+				init: function(){
+
+					var studentFoldersPath = V.hwDir+'/'+V.outputDir;
+
+					axios({
+						method: 'post',
+						url: '/ls',
+						data: {
+							path: studentFoldersPath
+						}
+					}).then(function(resp){
+						var dirs = resp.data;
+						dirs.forEach(function(dir){
+							if (dir[0] !== '.'){
+								V.students.push({
+									dir: dir,
+									grade: '',
+									comments: '',
+									graded: false
+								})
+							}
+						})
+
+						V.load();
+					})
+				},
+				save: function(){
+					var dat = "";
+					V.students.forEach(function(student){
+						if (student.grade !== ''){
+							var stuName = student.dir;
+							if (V.namesNeedReformatting){
+								var nar = student.dir.split(' ');
+								var lastName = nar[1].split('_')[0]
+								var firstName = nar[0];
+								stuName = lastName+firstName.substring(2);
+								console.log(stuName);
+							}
+
+							dat += "!"+stuName+" "+student.grade+"\n";
+							if (student.comments !== '')
+								dat += student.comments+"\n"
+							dat += "\n"
+						}
+					})
+
+					axios({
+						method: 'post',
+						url: '/save',
+						data: {
+							dir: V.hwDir,
+							dat: dat
+						}
+					}).then(function(resp){
+						console.log(resp)
+					})
+				},
+				load: function(){
+					axios({
+						method: 'post',
+						url: '/load',
+						data: {
+							dir: V.hwDir
+						}
+					}).then(function(resp){
+						// var raw = resp.data.split('\n\n') // this could be problem in comments
+						// var ar = raw.map(function(txt){
+						// 	var lines = txt.split("\n");
+						// 	console.log(lines);
+						// 	if (lines[0][0] !== "!"){
+						// 		console.log("ERROR: loading found inconsistent new lines")
+						// 		return false;
+						// 	}
+						// 	var far = lines[0].substring(1)[0].split(" ")
+						// 	console.log(far);
+						// 	return {
+						// 		dir: far[0],
+						// 		grade: far[1],
+						// 		comments: lines[1],
+						// 		graded: true
+						// 	}
+						// })
+
+						var lines = resp.data.split('\n');
+						console.log(lines)
+						var savedStudents = []
+						var nextStudent = {comments: []}
+						for (var i = 0; i < lines.length; i++) {
+							var line = lines[i]
+							if (line === "")
+								continue;
+							if (line[0] === "!"){
+								if (nextStudent.dir !== undefined)
+									savedStudents.push(nextStudent)
+
+								var lar = line.substring(1).split(" ")
+								nextStudent = {comments: []}
+								nextStudent.dir = lar[0];
+								nextStudent.grade = lar[1];
+							}
+							else{
+								nextStudent.comments.push(line)
+							}
+						}
+
+						if (nextStudent.dir !== undefined)
+							savedStudents.push(nextStudent);
+
+						// ar = ar.filter(function(o){ 
+						// 	if (o === false)
+						// 		return false;
+						// 	else
+						// 		return true;
+						// });
+
+						console.log(savedStudents);
+
+						savedStudents.forEach(function(savedStudent){
+							var stu = _.find(V.students, function(student){
+								return student.dir == savedStudent.dir
+							})
+							stu.grade = savedStudent.grade;
+							stu.comments = savedStudent.comments.join('\n\n');
+							stu.graded = savedStudent.graded;
+						})
+
+						V.selectedStudent = V.students[0];
+					})
+				},
+				nextStudent: function(){
+					var ind = _.findIndex(V.students, function(stu){
+						return stu.dir == V.selectedStudent.dir;
+					})
+					ind += 1;
+					if (ind >= V.students.length)
+						ind = 0;
+					V.selectStudent(V.students[ind])
+				},
+				prevStudent: function(){
+					var ind = _.findIndex(V.students, function(stu){
+						return stu.dir == V.selectedStudent.dir;
+					})
+					ind -= 1;
+					if (ind < 0)
+						ind = V.students.length-1;
+					V.selectStudent(V.students[ind])
+				},
+				nextFile: function(){
+					var ind = _.findIndex(V.selectedStudent.files, function(file){
+						return file.py.name == V.selectedStudent.selectedFile.py.name;
+					})
+					ind += 1;
+					if (ind >= V.selectedStudent.files.length)
+						ind = 0;
+					V.selectFile(V.selectedStudent.files[ind])
+				},
+				prevFile: function(){
+					var ind = _.findIndex(V.selectedStudent.files, function(file){
+						return file.py.name == V.selectedStudent.selectedFile.py.name;
+					})
+					ind -= 1;
+					if (ind < 0)
+						ind = V.selectedStudent.files.length-1;
+					V.selectFile(V.selectedStudent.files[ind])
+				},
+				selectStudent: function(student){
+					V.selectedStudent = student;
+					var stuPath = [V.hwDir, V.outputDir, student.dir].join('/');
+					$('#testerCol').html("");
+					$('#codeCol').html("");
+
+					axios({
+						method: 'post',
+						url: '/ls',
+						data: {
+							path: stuPath
+						}
+					}).then(function(resp){
+						console.log(resp);
+						var files = resp.data.sort();
+						var htmlFiles = files.filter(function(file){
+							var tar = file.split('.')
+							return tar[tar.length-1] == 'html';
+						})
+
+						var rtfFiles = files.filter(function(file){
+							var tar = file.split('.')
+							return tar[tar.length-1] == 'rtf';
+						})
+
+						var pyFiles = files.filter(function(file){
+							var tar = file.split('.')
+							return tar[tar.length-1] == 'py' && file.indexOf('grader') === -1;
+						})
+
+						V.selectedStudent.files = pyFiles.map(function(pyFile){
+							// loop over html files and see if there is a corresponding grade file
+							var o = {
+								py: {name: pyFile}
+							}
+							htmlFiles.forEach(function(htmlFile){
+								if (htmlFile.indexOf(pyFile) !== -1)
+									o.grader = {name: htmlFile}
+							})
+							return o;
+						})
+
+						rtfFiles.forEach(function(file){
+							V.selectedStudent.files.push({
+								rtf: {name: file}
+							})
+						})
+
+
+						V.processFiles(stuPath, V.selectedStudent.files)
+					})
+				},
+				selectFile: function(file){
+					console.log(file);
+					V.selectedStudent.selectedFile = file;
+					V.$forceUpdate();
+				},
+				processFiles: function(studentPath, files){
+					axios({
+						method: 'post',
+						url: '/processFiles',
+						data: {
+							path: studentPath,
+							files: files,
+						}
+					}).then(function(resp){
+						console.log(resp);
+						var cleaned = resp.data.map(function(file){
+							if (file.grader){
+								var el = document.createElement('html');
+								el.innerHTML = file.grader.html;
+								file.grader.html = $(el).find('body').html();
+							}
+							return file;
+						})
+						console.log(cleaned);
+						V.selectedStudent.files = cleaned;
+						V.selectedStudent.selectedFile = V.selectedStudent.files[0];
+						V.$forceUpdate();
+					})
+				},
+				getHighlightedPythonFiles: function(studentPath, files){
+					axios({
+						method: 'post',
+						url: '/getHighlightedPythonFiles',
+						data: {
+							path: studentPath,
+							files: files,
+						}
+					}).then(function(resp){
+						console.log(resp);
+						resp.data.forEach(function(file){
+							var el = document.createElement('pre')
+							el.innerHTML = file;
+							$('#codeCol').append(el);
+						})
+					})
+				},
+				getFile: async function(path){
+					var result = await axios({
+						method: 'post',
+						url: '/highlightFile',
+						data: {
+							path: path
+						}
+					}).then(function(resp){
+						console.log(resp);
+						return resp;
+					})
+				}
+			}
+		});
+
+		V.init();
+
+		var getUrlParameter = function getUrlParameter(sParam) {
+		    var sPageURL = decodeURIComponent(window.location.search.substring(1)),
+		        sURLVariables = sPageURL.split('&'),
+		        sParameterName,
+		        i;
+
+		    for (i = 0; i < sURLVariables.length; i++) {
+		        sParameterName = sURLVariables[i].split('=');
+
+		        if (sParameterName[0] === sParam) {
+		            return sParameterName[1] === undefined ? true : sParameterName[1];
+		        }
+		    }
+		};
+				
+
+
+	</script>
+</body>
+</html>
