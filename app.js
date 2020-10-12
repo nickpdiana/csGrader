@@ -49,35 +49,50 @@ app.post('/processFiles', async function(req, res){
     //listing all files using forEach
     for (var i=0; i<files.length; i++){
     	var file = files[i];
+    	var far = file.split('.')
+    	var ext = far[far.length-1].toLowerCase();
+
     	console.log(file)
-		if (file.py){
-			var ret = await fs.promises.readFile(directoryPath+"/"+file.py.name, 'utf8', function(err, data) {
+
+    	var o = {
+    		name: file
+    	}
+
+		if (ext === 'py'){
+			var ret = await fs.promises.readFile(directoryPath+"/"+file, 'utf8', function(err, data) {
 				if (err) throw err;
 			})
-			file.py.html = hljs.highlight('python', ret).value
+			o.type = 'py'
+			o.html = '<pre>'+hljs.highlight('python', ret).value+'</pre>';
 		}
-		if (file.grader){
-			var ret = await fs.promises.readFile(directoryPath+"/"+file.grader.name, 'utf8', function(err, data) {
+		if (ext === 'html'){
+			var ret = await fs.promises.readFile(directoryPath+"/"+file, 'utf8', function(err, data) {
 				if (err) throw err;
 			})
-			file.grader.html = ret;
+			o.type = 'html'
+			o.html = ret;
 		}
-		if (file.rtf){
-			var ret = await fs.promises.readFile(directoryPath+"/"+file.rtf.name, 'utf8', function(err, data) {
+		if (ext === 'txt'){
+			var ret = await fs.promises.readFile(directoryPath+"/"+file, 'utf8', function(err, data) {
+				if (err) throw err;
+			})
+			o.type = 'txt'
+			o.html = '<pre>'+ret+'</pre>';
+		}
+		if (ext === 'rtf'){
+			var ret = await fs.promises.readFile(directoryPath+"/"+file, 'utf8', function(err, data) {
 				if (err) throw err;
 			})
 			var h = await new Promise((resolve, reject) => {
 				rtfToHTML.fromString(ret, function(err,html){
 					if (err) throw err;
-					console.log(html);
 					resolve(html);
 				});
 			});
-			console.log(h);
-			file.rtf.html = h;
+			o.type = 'rtf'
+			o.html = h;
 		}
-		console.log("PUSH FILE");
-		rar.push(file);
+		rar.push(o);
     };
     res.send(rar);
 });
