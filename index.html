@@ -13,16 +13,49 @@
 
 		body, input, textarea, button{
 			font-family: 'Libre Franklin', sans-serif;
+			margin: 0;
+			padding: 0;
 		}
+
+		div, input, textarea{box-sizing: border-box;}
 
 		h1{
 			font-family: 'DM Serif Display', serif;
-			padding: .25em;
+			padding: .5em;
+			width: 15%;
+			text-align: center;
 		}
 
 		pre{
 			font-family: 'Inconsolata', monospace;
 		}
+
+		input, textarea{
+			padding: .5em;
+			border: 0;
+			border: 1px solid #1f3c88;
+		}
+			input:focus, textarea:focus{
+				border: 1px solid #ee6f57;
+				color: black;
+				outline: none;
+			}
+
+		button{
+			padding: .5em;
+			background: #1f3c88;
+			border: 0;
+			border: 1px solid #1f3c88;
+			color: white;
+		}
+			button:hover{
+				cursor: pointer;
+				background: #ee6f57;
+				border: 1px solid #ee6f57;
+				color: white;
+			}
+
+		#mainContain{position: relative;}
 
 		#mainCols{
 			display: flex;
@@ -30,8 +63,10 @@
 		}
 
 		#nav{
-			display: flex;
-			align-items: stretch;
+			display: flex; 
+			/*justify-content: space-between;*/
+			background: #070d59;
+			color: #f6f5f5;
 		}
 
 		div, iframe, pre{
@@ -50,11 +85,18 @@
 				font-size: 5em;
 				text-align: center;
 				margin-bottom: .25em;
+				padding: 0;
+				border: none;
 			}
+			#studentGrade:focus{
+				outline: none;
+				color: #ee6f57;
+			}
+
 			#studentComments{
 				display: block;
 				width: 100%;
-				min-height: 100px;
+				min-height: 200px;
 			}
 
 		#studentCol{
@@ -62,59 +104,73 @@
 		}
 
 			#studentCol div{
-				padding: .5em
+				padding: .75em 1em;
+				border-bottom: 1px solid rgba(7, 13, 89,0.1);
 			}
 
 			#studentCol div:hover{
 				cursor: pointer;
-				background: dodgerblue;
+				background: #1f3c88;
 				color: white;
 			}
 
 			.selectedStudent{
-				background: dodgerblue;
+				background: #1f3c88;
 				color: white;
 			}
 
 		#infoCol{
 			width: 85%;
-			padding: 1em;
+			padding: 0em 1em;
+			margin-bottom: 300px;
 		}
 
-		#testerCol{
-			width: 45%;
-		}
-			#testerCol iframe, #codeCol pre{
-				width: 100%;
-				border: none;
-				border-bottom: 1px solid dodgerblue;
-				height: 500px;
-				margin: 0;
-				padding: .5em;
-				overflow: scroll;
-				display:block;
-			}
-		#codeCol{
-			width: 45%;
-		}
+		
 		#fileNav{
 			display: flex;
 			flex-wrap: nowrap;
 			/*justify-content: space-around;*/
 			justify-content: stretch;
+			margin-bottom: 1em;
 		}
 			#fileNav > div{
-				padding: .5em;
+				padding: .75em 1em;
 				flex-grow: 1;
+				text-align: center;
+				border-right: 1px solid rgba(7, 13, 89,0.2);
 			}
 			#fileNav > div:hover{
-				text-decoration: underline;
 				cursor: pointer;
+				background: #1f3c88;
+				color: white;
+				border-bottom: 1px solid #1f3c88;
 			}
+
+			.selectedFile{
+				background: #1f3c88;
+				color: white;
+				border-bottom: 1px solid #1f3c88;
+			}
+
+		#fileContain{
+			/*padding: 1em;*/
+		}
 
 		/*iframe{
 			transform: scale(0.75);
 		}*/
+
+		#saveDot{
+			position: absolute;
+			z-index: 10;
+			font-family: sans-serif;
+			font-size: 12em;
+			right: .1em;
+			top: -.3em;
+		}
+			#saveDot > span{
+				font-size: .1em;
+			}
 
 		table.diff {font-family:Courier; border:medium;}
         .diff_header {background-color:#e0e0e0}
@@ -128,15 +184,20 @@
 <body>
 
 	<div id="mainContain">
-		<div style="display: flex; justify-content: space-between;">
+		<div id="nav">
 			<h1>CS Grader</h1>
 			<div style="width: 50%; display: flex; flex-direction: column; justify-content: space-around;">
 				<div>HW Directory: <input v-model="hwDir" style="width: 80%;" /></div>
 				<div>Names Need Reformatting: <input type="checkbox"> <button v-on:click="reload()">Reload</button></div>
 			</div>
 			
-			<div><button v-on:click="save()">Save</button></div>
-			
+			<!-- <div><button v-on:click="save()">Save</button></div> -->
+			<div style="width: 20%;"></div>
+		</div>
+
+		<div id="saveDot" v-bind:style="{color: saved ? '#7ea04d' : '#c56183'}">
+			<!-- <span v-if="saved">Saved</span><span v-else>Unsaved Changes</span>  -->
+			&middot;
 		</div>
 
 		<div id="assessmentContain">
@@ -147,23 +208,19 @@
 		<div id="mainCols">
 			<div id="studentCol">
 				<div v-for="student in students" v-on:click="selectStudent(student)" v-bind:class="{selectedStudent: selectedStudent.dir == student.dir}">
-					{{student.dir | truncate(20)}}
+					<span v-if="student.grade !== ''">&checkmark;</span> {{student.dir | truncate(20)}}
 				</div>
 			</div>
 			<div id="infoCol">
 				<div id="fileNav">
-					<div v-for="file in selectedStudent.files" v-on:click="selectFile(file)" v-bind:class="{selectedStudent: selectedStudent.selectedFile.name == file.name}">{{file.name}}</div>
+					<div v-for="file in selectedStudent.files" v-on:click="selectFile(file)" v-bind:class="{selectedFile: selectedStudent.selectedFile.name == file.name}">{{file.name}}</div>
 				</div>
-				<input id="runCommand" v-model="runCommand" style="width: 70%"/> <button v-on:click="copyRunCommand()">Copy</button>
-				<div v-if="selectedStudent.selectedFile.graderHtml" v-html="selectedStudent.selectedFile.graderHtml"></div>
-				<div v-if="selectedStudent.selectedFile.html" v-html="selectedStudent.selectedFile.html"></div>
+				<div id="fileContain">
+					<input id="runCommand" v-model="runCommand" style="width: 70%"/> <button v-on:click="copyRunCommand()">Copy</button>
+					<div v-if="selectedStudent.selectedFile.graderHtml" v-html="selectedStudent.selectedFile.graderHtml"></div>
+					<div v-if="selectedStudent.selectedFile.html" v-html="selectedStudent.selectedFile.html"></div>
+				</div>
 			</div>
-			<!-- <div id="testerCol">
-				
-			</div>
-			<div id="codeCol">
-				
-			</div> -->
 		</div>
 	</div>
 
@@ -192,11 +249,19 @@
 					}
 				},
 				namesNeedReformatting: false,
-				runCommand: ""
+				runCommand: "",
+				saving: false,
+				saved: false
 			},
 			computed: {
 			},
 			watch: {
+				students: {
+					deep: true,
+					handler(){
+						V.saved = false;
+					}
+				}
 			},
 			mounted(){
 		        this._keyListener = function(e) {
@@ -219,7 +284,7 @@
 	            		}
 		            }
 
-		            if (document.getElementById('studentComments') === document.activeElement){
+		            if (document.getElementById('studentComments') === document.activeElement || document.getElementById('studentGrade') === document.activeElement){
 		            	if (e.key === "Escape") {
 		            		e.preventDefault();
 		            		document.activeElement.blur();
@@ -281,10 +346,20 @@
 						})
 
 						V.load();
+						V.autoSave();
 						V.$forceUpdate();
 					})
 				},
+				autoSave: function(){
+					window.setInterval(function(){
+						if (V.saving !== true){
+							V.save()
+						}
+					}, 2000);
+					
+				},
 				save: function(){
+					V.saving = true;
 					var dat = "";
 					V.students.forEach(function(student){
 						if (student.grade !== ''){
@@ -312,7 +387,9 @@
 							dat: dat
 						}
 					}).then(function(resp){
-						console.log(resp)
+						// console.log(resp)
+						V.saving = false;
+						V.saved = true;
 					})
 				},
 				load: function(){
@@ -398,7 +475,7 @@
 				},
 				nextFile: function(){
 					var ind = _.findIndex(V.selectedStudent.files, function(file){
-						return file.py.name == V.selectedStudent.selectedFile.py.name;
+						return file.name == V.selectedStudent.selectedFile.name;
 					})
 					ind += 1;
 					if (ind >= V.selectedStudent.files.length)
@@ -407,7 +484,7 @@
 				},
 				prevFile: function(){
 					var ind = _.findIndex(V.selectedStudent.files, function(file){
-						return file.py.name == V.selectedStudent.selectedFile.py.name;
+						return file.name == V.selectedStudent.selectedFile.name;
 					})
 					ind -= 1;
 					if (ind < 0)
@@ -417,8 +494,7 @@
 				selectStudent: function(student){
 					console.log("SELECTING A STUDENT");
 					var stuPath = [V.hwDir, V.outputDir, student.dir].join('/');
-					$('#testerCol').html("");
-					$('#codeCol').html("");
+
 
 					axios({
 						method: 'post',
