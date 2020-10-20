@@ -16,5 +16,5 @@ Run `node app.js` to start server. Then navigate to `127.0.0.1:3000`
 
 ### Grading
 *Note: While Grade Input and Comment Input are selected, other navigation key shortcuts are disabled*  
-Tab = Jump to *Grade Input*/Switch between *Grade Input* and *Comment Input*  
-Escape = Exit *Grade Input* or *Comment Input* (re-enable other shortcuts)  
+Tab = Jump to **Grade Input**/Switch between **Grade Input** and **Comment Input**  
+Escape = Exit **Grade Input** or **Comment Input** (re-enable other shortcuts)  
