@@ -15,6 +15,7 @@
 			font-family: 'Libre Franklin', sans-serif;
 			margin: 0;
 			padding: 0;
+			background: #fafafa
 		}
 
 		div, input, textarea{box-sizing: border-box;}
@@ -33,26 +34,26 @@
 		input, textarea{
 			padding: .5em;
 			border: 0;
-			border: 1px solid #1f3c88;
+			border: 1px solid #a2d5f2;
 		}
 			input:focus, textarea:focus{
-				border: 1px solid #ee6f57;
+				border: 1px solid #ff7e67;
 				color: black;
 				outline: none;
 			}
 
 		button{
 			padding: .5em;
-			background: #1f3c88;
+			background: #a2d5f2;
 			border: 0;
-			border: 1px solid #1f3c88;
-			color: white;
+			border: 1px solid #a2d5f2;
+			color: black;
 		}
 			button:hover{
 				cursor: pointer;
-				background: #ee6f57;
-				border: 1px solid #ee6f57;
-				color: white;
+				background: #ff7e67;
+				border: 1px solid #ff7e67;
+				color: black;
 			}
 
 		#mainContain{position: relative;}
@@ -65,7 +66,7 @@
 		#nav{
 			display: flex; 
 			/*justify-content: space-between;*/
-			background: #070d59;
+			background: #07689f;
 			color: #f6f5f5;
 		}
 
@@ -90,7 +91,7 @@
 			}
 			#studentGrade:focus{
 				outline: none;
-				color: #ee6f57;
+				color: #ff7e67;
 			}
 
 			#studentComments{
@@ -101,6 +102,7 @@
 
 		#studentCol{
 			width: 15%;
+			border-right: 1px solid rgba(7, 13, 89,0.1);
 		}
 
 			#studentCol div{
@@ -110,18 +112,18 @@
 
 			#studentCol div:hover{
 				cursor: pointer;
-				background: #1f3c88;
-				color: white;
+				/*background: #a2d5f2;*/
+				color: #ff7e67;
 			}
 
 			.selectedStudent{
-				background: #1f3c88;
-				color: white;
+				/*background: #a2d5f2;*/
+				color: #ff7e67;
 			}
 
 		#infoCol{
 			width: 85%;
-			padding: 0em 1em;
+			padding: 0em 0em;
 			margin-bottom: 300px;
 		}
 
@@ -132,6 +134,7 @@
 			/*justify-content: space-around;*/
 			justify-content: stretch;
 			margin-bottom: 1em;
+			border-bottom: 1px solid rgba(7, 13, 89,0.1);
 		}
 			#fileNav > div{
 				padding: .75em 1em;
@@ -141,19 +144,19 @@
 			}
 			#fileNav > div:hover{
 				cursor: pointer;
-				background: #1f3c88;
-				color: white;
-				border-bottom: 1px solid #1f3c88;
+				/*background: #a2d5f2;*/
+				color: #ff7e67;
+				/*border-bottom: 1px solid #a2d5f2;*/
 			}
 
 			.selectedFile{
-				background: #1f3c88;
-				color: white;
-				border-bottom: 1px solid #1f3c88;
+				/*background: #a2d5f2;*/
+				color: #ff7e67;
+				/*border-bottom: 1px solid #a2d5f2;*/
 			}
 
 		#fileContain{
-			/*padding: 1em;*/
+			padding: 0em 1em;
 		}
 
 		/*iframe{
