@@ -4,6 +4,12 @@
 
 Run `node app.js` to start server. Then navigate to `127.0.0.1:3000`
 
+Once, the webpage opens, update the path in the **HW Directory** field to be the path to the directory containing student folders.
+
+**Note:** This directory can either be the resulting directory created by running Joel's reformatting/testing script OR simply the unzipped submissions file from Moodle. However, in the latter case, you should also tick the **Names Need Reformatting** box, because the program uses directory names as the source for student names.
+
+OUTPUT DIRECTORY
+
 ## Shortcuts
 
 ### Navigating Students
