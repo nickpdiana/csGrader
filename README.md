@@ -4,11 +4,18 @@
 
 Run `node app.js` to start server. Then navigate to `127.0.0.1:3000`
 
-Once, the webpage opens, update the path in the **HW Directory** field to be the path to the directory containing student folders.
+Once, the webpage opens, update the path in the **HW Directory** field to be the path to the directory containing a directory called `output` which contains directories for each student. For example:
 
-**Note:** This directory can either be the resulting directory created by running Joel's reformatting/testing script OR simply the unzipped submissions file from Moodle. However, in the latter case, you should also tick the **Names Need Reformatting** box, because the program uses directory names as the source for student names.
+```
+|-- /Users/ndiana/Documents/Classes/Fall2020/COSC101/grading/hw04
+|   |-- output/
+|       |-- smithjo/
+|       |-- jonesja/
+|       |-- millerwi/
+...
+```
 
-OUTPUT DIRECTORY
+**Note:** This directory can either be the resulting directory created by running Joel's reformatting/testing script OR simply the unzipped submissions file from Moodle. However, in the latter case, you should also tick the **Names Need Reformatting** box, because the program uses directory names as the source for student names. In either case, the program looks for the specific name `output`.
 
 ## Shortcuts
 
