@@ -191,11 +191,14 @@
 			<h1>101 Grader</h1>
 			<div style="width: 50%; display: flex; flex-direction: column; justify-content: space-around;">
 				<div>HW Directory: <input v-model="hwDir" style="width: 80%;" /></div>
+				
+			</div>
+			<div style="width: 50%; display: flex; flex-direction: column; justify-content: space-around;">
 				<div>Names Need Reformatting: <input type="checkbox" v-model="namesNeedReformatting"> <button v-on:click="reload()">Reload</button></div>
 			</div>
 			
 			<!-- <div><button v-on:click="save()">Save</button></div> -->
-			<div style="width: 20%;"></div>
+			<!-- <div style="width: 20%;"></div> -->
 		</div>
 
 		<div id="saveDot" v-bind:style="{color: saved ? '#7ea04d' : '#c56183'}">
