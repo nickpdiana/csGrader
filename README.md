@@ -1,5 +1,8 @@
 # 101 Grader
 
+## Purpose
+Navigate and grade files for COSC101 in one window and without having to leave the keyboard.
+
 ## Usage
 
 Run `node app.js` to start server. Then navigate to `127.0.0.1:3000`
@@ -15,7 +18,9 @@ Once, the webpage opens, update the path in the **HW Directory** field to be the
 ...
 ```
 
-**Note:** This directory can either be the resulting directory created by running Joel's reformatting/testing script OR simply the unzipped submissions file from Moodle. However, in the latter case, you should also tick the **Names Need Reformatting** box, because the program uses directory names as the source for student names. In either case, the program looks for the specific name `output`.
+**Note:** This directory can either be the resulting directory created by running Joel's reformatting/testing script OR simply the unzipped submissions file from Moodle. However, in the latter case, you should also tick the **Names Need Reformatting** box, because the program uses directory names as the source for student names. In either case, the program looks for the specific directory named `output`.
+
+Click **Reload** to reload the page with the new directory. The information you enter is saved in your browswer's local storage, so you only have to do this once for each assignment.
 
 ## Shortcuts
 
