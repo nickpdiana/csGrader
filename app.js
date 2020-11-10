@@ -6,6 +6,7 @@ const path = require('path');
 const fs = require('fs');
 const hljs = require('highlightjs');
 const rtfToHTML = require('@iarna/rtf-to-html')
+const { spawn } = require("child_process");
 
 app.use(express.static('.'))
 
@@ -159,6 +160,101 @@ app.post('/ls', function(req, res){
 	    res.send(rar)
 	});
 	// res.send(JSON.stringify(rar));
+});
+
+app.post('/runScript', function(req, res){
+
+	const ls = spawn("python3", [req.body.path]);
+
+	ls.stdin.write(req.body.input);
+	ls.stdin.end();
+
+	var ret = [];
+	ls.stdout.on("data", data => {
+	    console.log(`${data}`);
+	    ret.push(`${data}`);
+	});
+
+	ls.stderr.on("data", data => {
+	    console.log(`stderr: ${data}`);
+	});
+
+	ls.on('error', (error) => {
+	    console.log(`error: ${error.message}`);
+	});
+
+	ls.on("close", code => {
+	    console.log(`child process exited with code ${code}`);
+	    res.send(ret);
+	});
+
+});
+
+app.post('/runScriptWithLine', function(req, res){
+
+	var newPath = req.body.path+"_temp.py";
+	fs.copyFile(req.body.path, newPath, function(err){
+
+		fs.appendFileSync(newPath, req.body.line);
+
+		const ls = spawn("python3", [newPath]);
+
+		ls.stdin.write(req.body.input);
+		ls.stdin.end();
+
+		var ret = [];
+		ls.stdout.on("data", data => {
+		    console.log(`${data}`);
+		    ret.push(`${data}`);
+		});
+
+		ls.stderr.on("data", data => {
+		    console.log(`stderr: ${data}`);
+		});
+
+		ls.on('error', (error) => {
+		    console.log(`error: ${error.message}`);
+		});
+
+		ls.on("close", code => {
+		    console.log(`child process exited with code ${code}`);
+		    fs.unlinkSync(newPath);
+		    console.log(`Temporary file ${newPath} deleted`);
+		    res.send(ret);
+		});
+
+	})
+
+	
+
+});
+
+app.post('/makeGradeFile', function(req, res){
+
+	var hwDirPath = req.body.path;
+	console.log(hwDirPath);
+	
+	const ls = spawn("python3", ['mkgradesheet.py', '-g', `${hwDirPath}/grades.txt`, '-c', `${hwDirPath}/moodleGrades.csv`, '-o', `${hwDirPath}/gradeOutput.csv`, '-f']);
+
+	var ret = [];
+	ls.stdout.on("data", data => {
+	    console.log(`${data}`);
+	    ret.push(`${data}`);
+	});
+
+	ls.stderr.on("data", data => {
+	    console.log(`stderr: ${data}`);
+	});
+
+	ls.on('error', (error) => {
+	    console.log(`error: ${error.message}`);
+	});
+
+	ls.on("close", code => {
+	    console.log(`child process exited with code ${code}`);
+	    res.send(ret);
+	});
+
 });
 
 

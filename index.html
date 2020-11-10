@@ -68,10 +68,18 @@
 			/*justify-content: space-between;*/
 			background: #07689f;
 			color: #f6f5f5;
+			align-items: center;
 		}
+			#nav > *{
+				/*border: 1px solid red;*/
+			}
 
 		div, iframe, pre{
 			box-sizing: border-box;
+		}
+
+		pre{
+			white-space: pre-wrap; 
 		}
 
 		#assessmentContain{
@@ -159,6 +167,14 @@
 			padding: 0em 1em;
 		}
 
+		#terminal{
+			background: #07689f;
+			color: #f6f5f5;
+			padding: 1em;
+			margin: .5em 0 0 0;
+			width: 50%;
+		}
+
 		/*iframe{
 			transform: scale(0.75);
 		}*/
@@ -189,22 +205,27 @@
 	<div id="mainContain">
 		<div id="nav">
 			<h1>101 Grader</h1>
-			<div style="width: 50%; display: flex; flex-direction: column; justify-content: space-around;">
-				<div>HW Directory: <input v-model="hwDir" style="width: 80%;" /></div>
-				
+			<div style="width: 50%;">
+				HW Directory: <input v-model="hwDir" style="width: 80%;" />
 			</div>
-			<div style="width: 50%; display: flex; flex-direction: column; justify-content: space-around;">
-				<div>Names Need Reformatting: <input type="checkbox" v-model="namesNeedReformatting"> <button v-on:click="reload()">Reload</button></div>
+			<div style="width: 20%;">
+				Names Need Reformatting: <input type="checkbox" v-model="namesNeedReformatting">
+			</div>
+			<div style="width: 10%">
+				<button v-on:click="reload()">Reload</button>
+			</div>
+			<div style="width: 10%; margin-right: 1em;">
+				<button v-if="!saved" v-on:click="save()" style="background: #ff7e67; border: 1px solid #ff7e67">Save Unsaved Changes</button>
 			</div>
 			
 			<!-- <div><button v-on:click="save()">Save</button></div> -->
 			<!-- <div style="width: 20%;"></div> -->
 		</div>
 
-		<div id="saveDot" v-bind:style="{color: saved ? '#7ea04d' : '#c56183'}">
-			<!-- <span v-if="saved">Saved</span><span v-else>Unsaved Changes</span>  -->
+		<!-- <div id="saveDot" v-on:click="save()" v-bind:style="{color: saved ? '#7ea04d' : '#c56183'}">
+			<span v-if="saved">Saved</span><span v-else>Unsaved Changes</span> 
 			&middot;
-		</div>
+		</div> -->
 
 		<div id="assessmentContain">
 			<input id="studentGrade" v-model="selectedStudent.grade" placeholder="grade" />
@@ -216,15 +237,31 @@
 				<div v-for="student in students" v-on:click="selectStudent(student)" v-bind:class="{selectedStudent: selectedStudent.dir == student.dir}">
 					<span v-if="student.grade !== ''">&checkmark;</span> {{student.dir | truncate(20)}}
 				</div>
+				<div style="text-align: center;"><button v-on:click="makeGradeFile()">Make Grade File</button></div>
 			</div>
 			<div id="infoCol">
 				<div id="fileNav">
 					<div v-for="file in selectedStudent.files" v-on:click="selectFile(file)" v-bind:class="{selectedFile: selectedStudent.selectedFile.name == file.name}">{{file.name}}</div>
 				</div>
 				<div id="fileContain">
-					<input id="runCommand" v-model="runCommand" style="width: 70%"/> <button v-on:click="copyRunCommand()">Copy</button>
+					
+					<!-- <textarea v-model="pipedInput" style=""></textarea> -->
+
+					<div style="display: flex; margin-bottom: .5em;">
+						<input id="pipedInput" placeholder="piped input seperated by commas" v-model="fileInput" style="width: 50%;"/>
+						<button style="margin-left: .5em;" v-on:click="runScript()">Run Script with Piped Input</button>
+					</div>
+					<div style="display: flex; align-items: flex-start;">
+						<textarea id="additionalCode" placeholder="additional code to append to file" v-model="additionalCode" style="width: 50%"></textarea>
+						<button style="margin-left: .5em;" v-on:click="runScriptWithLine()">Run Script with Additional Code</button>
+					</div>
+					<pre id="terminal" v-html="'PROGRAM OUTPUT\n'+terminal"></pre>
+
 					<div v-if="selectedStudent.selectedFile.graderHtml" v-html="selectedStudent.selectedFile.graderHtml"></div>
 					<div v-if="selectedStudent.selectedFile.html" v-html="selectedStudent.selectedFile.html"></div>
+
+					<!-- <input id="runCommand" v-model="runCommand" style="width: 70%"/> <button v-on:click="copyRunCommand()">Copy</button>&nbsp; -->
+
 				</div>
 			</div>
 		</div>
@@ -256,6 +293,10 @@
 				},
 				namesNeedReformatting: false,
 				runCommand: "",
+				fileInputs: {},
+				fileInput: "",
+				terminal: "",
+				additionalCode: "",
 				saving: false,
 				saved: false
 			},
@@ -267,6 +308,9 @@
 					handler(){
 						V.saved = false;
 					}
+				},
+				fileInput: function(newVal, oldVal){
+					V.fileInputs[this.selectedStudent.selectedFile.name] = V.fileInput;
 				}
 			},
 			mounted(){
@@ -290,7 +334,31 @@
 	            		}
 		            }
 
-		            if (document.getElementById('studentComments') === document.activeElement || document.getElementById('studentGrade') === document.activeElement){
+		            var textareas = ['studentComments', 'additionalCode'];
+		            var inputBoxes = ['studentGrade', 'pipedInput']
+
+		            // If textarea, return early
+		            if (textareas.indexOf(document.activeElement.id) !== -1){
+		            	if (e.key === "Escape") {
+		            		e.preventDefault();
+		            		document.activeElement.blur();
+			            }
+		            	return;
+		            }
+
+		            if (e.key === "ArrowUp") {
+		                console.log("PREV STUDENT");
+		                e.preventDefault();
+		                V.prevStudent();
+		            }
+		            if (e.key === "ArrowDown") {
+		                console.log("NEXT STUDENT");
+		                e.preventDefault();
+		                V.nextStudent();
+		            }
+
+		            // If inputs, check for up or down, then return
+		            if (inputBoxes.indexOf(document.activeElement.id) !== -1){
 		            	if (e.key === "Escape") {
 		            		e.preventDefault();
 		            		document.activeElement.blur();
@@ -308,16 +376,11 @@
 		                e.preventDefault();
 		                V.prevFile();
 		            }
-		            if (e.key === "ArrowUp") {
-		                console.log("PREV STUDENT");
-		                e.preventDefault();
-		                V.prevStudent();
-		            }
-		            if (e.key === "ArrowDown") {
-		                console.log("NEXT STUDENT");
-		                e.preventDefault();
-		                V.nextStudent();
-		            }
+
+		            // Up and Down Works for grade, but not for text area
+
+
+		            
 		        };
 
 		        document.addEventListener('keydown', this._keyListener.bind(this));
@@ -333,6 +396,10 @@
 					if (lsNamesNeedReformatting && lsNamesNeedReformatting !== null){
 						V.namesNeedReformatting = JSON.parse(lsNamesNeedReformatting);
 					}
+
+					var lsAdditionalCode = localStorage.getItem('additionalCode');
+					if (lsAdditionalCode)
+						V.additionalCode = lsAdditionalCode;
 
 					var studentFoldersPath = V.hwDir+'/'+V.outputDir;
 					console.log(studentFoldersPath);
@@ -357,7 +424,7 @@
 						})
 
 						V.load();
-						V.autoSave();
+						// V.autoSave();
 						V.$forceUpdate();
 					})
 				},
@@ -369,6 +436,14 @@
 					}, 2000);
 					
 				},
+				reformatName: function(name){
+					var nar = name.split(' ');
+					var lastName = nar[1].split('_')[0]
+					var firstName = nar[0];
+					stuName = lastName+firstName.substring(0,2);
+					stuName = stuName.toLowerCase();
+					return stuName;
+				},
 				save: function(){
 					V.saving = true;
 					var dat = "";
@@ -376,11 +451,7 @@
 						if (student.grade !== ''){
 							var stuName = student.dir;
 							if (V.namesNeedReformatting){
-								var nar = student.dir.split(' ');
-								var lastName = nar[1].split('_')[0]
-								var firstName = nar[0];
-								stuName = lastName+firstName.substring(2);
-								console.log(stuName);
+								stuName = V.reformatName(stuName);
 							}
 
 							dat += "!"+stuName+" "+student.grade+"\n";
@@ -399,6 +470,7 @@
 						}
 					}).then(function(resp){
 						// console.log(resp)
+						V.updateLS();
 						V.saving = false;
 						V.saved = true;
 					})
@@ -442,7 +514,7 @@
 
 							savedStudents.forEach(function(savedStudent){
 								var stu = _.find(V.students, function(student){
-									return student.dir == savedStudent.dir
+									return student.dir == savedStudent.dir || savedStudent.dir === V.reformatName(student.dir)
 								})
 								stu.grade = savedStudent.grade;
 								stu.comments = savedStudent.comments.join('\n\n');
@@ -462,6 +534,7 @@
 				updateLS: function(){
 					localStorage.setItem('hwDir', V.hwDir);
 					localStorage.setItem('namesNeedReformatting', JSON.stringify(V.namesNeedReformatting));
+					localStorage.setItem('additionalCode', V.additionalCode);
 				},
 				copyRunCommand: function(){
 					document.getElementById('runCommand').select();
@@ -523,7 +596,19 @@
 				selectFile: function(file){
 					console.log(file);
 					V.selectedStudent.selectedFile = file;
-					V.runCommand = "python3 "+[this.hwDir, this.outputDir, this.selectedStudent.dir, this.selectedStudent.selectedFile.name].join('/');
+					V.terminal = "";
+					V.runCommand = "python3 "+[this.hwDir, this.outputDir, this.selectedStudent.dir, this.selectedStudent.selectedFile.name].join('/').replace(' ', '\\ ');
+
+					if (V.fileInputs[this.selectedStudent.selectedFile.name] !== undefined){
+						V.fileInput = V.fileInputs[this.selectedStudent.selectedFile.name];
+					}
+					else{
+						V.fileInput = ""
+					}
+
+					if (this.selectedStudent.selectedFile.name.split('.').pop() == 'py')
+						V.runScript();
+
 					V.$forceUpdate();
 				},
 				processFiles: function(studentPath, files, student){
@@ -610,7 +695,48 @@
 						console.log(resp);
 						return resp;
 					})
-				}
+				},
+				runScript: function(){
+					var scriptPath = [this.hwDir, this.outputDir, this.selectedStudent.dir, this.selectedStudent.selectedFile.name].join('/')//.replace(' ', '\\ ');
+					axios({
+						method: 'post',
+						url: '/runScript',
+						data: {
+							path: scriptPath,
+							input: V.fileInput.split(',').join('\n')
+						}
+					}).then(function(resp){
+						console.log(resp);
+						V.terminal = resp.data.join('\n').replace('\\n', '\n');
+					})
+				},
+				runScriptWithLine: function(){
+					var scriptPath = [this.hwDir, this.outputDir, this.selectedStudent.dir, this.selectedStudent.selectedFile.name].join('/')//.replace(' ', '\\ ');
+					axios({
+						method: 'post',
+						url: '/runScriptWithLine',
+						data: {
+							path: scriptPath,
+							input: V.fileInput.split(',').join('\n'),
+							line: V.additionalCode
+						}
+					}).then(function(resp){
+						console.log(resp);
+						V.terminal = resp.data.join('\n').replace('\\n', '\n');
+					})
+				},
+				makeGradeFile: function(){
+					axios({
+						method: 'post',
+						url: '/makeGradeFile',
+						data: {
+							path: V.hwDir,
+						}
+					}).then(function(resp){
+						console.log(resp);
+						alert("Grade File Made!");
+					})
+				},
 			}
 		});
 
