@@ -6,6 +6,7 @@ const path = require('path');
 const fs = require('fs');
 const hljs = require('highlightjs');
 const rtfToHTML = require('@iarna/rtf-to-html')
+var textract = require('textract');
 const { spawn } = require("child_process");
 
 app.use(express.static('.'))
@@ -56,10 +57,12 @@ app.post('/processFiles', async function(req, res){
     	console.log(file)
 
     	var o = {
-    		name: file
-    	}
+    		name: file,
+    		runOriginal: true
+    	}	
 
 		if (ext === 'py'){
+			o.raw = fs.readFileSync(directoryPath+"/"+file, {encoding:'utf8', flag:'r'})
 			var ret = await fs.promises.readFile(directoryPath+"/"+file, 'utf8', function(err, data) {
 				if (err) throw err;
 			})
@@ -81,17 +84,29 @@ app.post('/processFiles', async function(req, res){
 			o.html = '<pre>'+ret+'</pre>';
 		}
 		if (ext === 'rtf'){
-			var ret = await fs.promises.readFile(directoryPath+"/"+file, 'utf8', function(err, data) {
-				if (err) throw err;
+			// var ret = await fs.promises.readFile(directoryPath+"/"+file, 'utf8', function(err, data) {
+			// 	if (err) throw err;
+			// })
+			var ret = await new Promise((resolve, reject) => {
+				var options = {
+					preserveLineBreaks: true
+				}
+				textract.fromFileWithPath(directoryPath+"/"+file, options, function( error, text ) {
+					if (error) throw error;
+					console.log(text);
+					resolve(text);
+				})
 			})
-			var h = await new Promise((resolve, reject) => {
-				rtfToHTML.fromString(ret, function(err,html){
-					if (err) throw err;
-					resolve(html);
-				});
-			});
-			o.type = 'rtf'
-			o.html = h;
+			// var h = await new Promise((resolve, reject) => {
+			// 	rtfToHTML.fromString(ret, function(err,html){
+			// 		if (err) throw err;
+			// 		resolve(html);
+			// 	});
+			// });
+			o.type = 'txt'
+			o.html = '<pre>'+ret+'</pre>';
+			// o.type = 'txt'
+			// o.html = '<pre>'+convertToPlain(ret);+'</pre>'
 		}
 		rar.push(o);
     };
@@ -164,7 +179,11 @@ app.post('/ls', function(req, res){
 
 app.post('/runScript', function(req, res){
 
-	const ls = spawn("python3", [req.body.path]);
+	const ls = spawn("python3", [req.body.path], {cwd: path.dirname(req.body.path)});
+
+	console.log('')
+	console.log(`Running ${req.body.path} with piped input`);
+	console.log('------------------------------------')
 
 	ls.stdin.write(req.body.input);
 	ls.stdin.end();
@@ -193,11 +212,56 @@ app.post('/runScript', function(req, res){
 app.post('/runScriptWithLine', function(req, res){
 
 	var newPath = req.body.path+"_temp.py";
+	console.log('')
+	console.log(`Running ${newPath} with piped input`);
+	console.log('------------------------------------')
 	fs.copyFile(req.body.path, newPath, function(err){
 
 		fs.appendFileSync(newPath, req.body.line);
 
-		const ls = spawn("python3", [newPath]);
+		const ls = spawn("python3", [newPath], {cwd: path.dirname(req.body.path)});
+
+		ls.stdin.write(req.body.input);
+		ls.stdin.end();
+
+		var ret = [];
+		ls.stdout.on("data", data => {
+		    console.log(`${data}`);
+		    ret.push(`${data}`);
+		});
+
+		ls.stderr.on("data", data => {
+		    console.log(`stderr: ${data}`);
+		});
+
+		ls.on('error', (error) => {
+		    console.log(`error: ${error.message}`);
+		});
+
+		ls.on("close", code => {
+		    console.log(`child process exited with code ${code}`);
+		    fs.unlinkSync(newPath);
+		    console.log(`Temporary file ${newPath} deleted`);
+		    res.send(ret);
+		});
+
+	})
+
+	
+
+});
+
+
+app.post('/runEditedScript', function(req, res){
+	var newPath = req.body.path+"_temp.py";
+
+	console.log('')
+	console.log(`Running ${newPath} with piped input`);
+	console.log('------------------------------------')
+
+	fs.writeFile(newPath, req.body.code, function(err){
+
+		const ls = spawn("python3", [newPath], {cwd: path.dirname(req.body.path)});
 
 		ls.stdin.write(req.body.input);
 		ls.stdin.end();
@@ -248,6 +312,7 @@ app.post('/makeGradeFile', function(req, res){
 
 	ls.on('error', (error) => {
 	    console.log(`error: ${error.message}`);
+	    res.send(`error: ${error.message}`)
 	});
 
 	ls.on("close", code => {
@@ -256,6 +321,34 @@ app.post('/makeGradeFile', function(req, res){
 	});
 
 });
+
+app.post('/copyCommonFiles', function(req, res){
+	var directoryPath = req.body.path;
+
+	var rar = []
+
+	var dirs = fs.readdirSync(directoryPath+'/output', { withFileTypes: true })
+	    .filter(dirent => dirent.isDirectory())
+	    .map(dirent => dirent.name)
+
+	dirs.forEach(function(destDir){
+		var files = fs.readdirSync(directoryPath+'/copy')
+
+		files.forEach(function(file){
+			var srcPath = req.body.path+'/copy/'+file;
+			var destPath = directoryPath+'/output/'+destDir+'/'+file;
+			fs.copyFileSync(srcPath, destPath);
+		})
+	})
+	res.send('Files copied!');
+
+})
+
+function convertToPlain(rtf) {
+    rtf = rtf.replace(/\\par[d]?/g, "");
+    rtf = rtf.replace(/\{\*?\\[^{}]+}|[{}]|\\\n?[A-Za-z]+\n?(?:-?\d+)?[ ]?/g, "")
+    return rtf.replace(/\\'[0-9a-zA-Z]{2}/g, "").trim();
+}
 
 
 

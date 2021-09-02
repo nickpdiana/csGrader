@@ -175,6 +175,12 @@
 			width: 50%;
 		}
 
+		#scriptEditor{
+			width: 100%;
+			height: 600px;
+			font-family: 'Inconsolata', monospace;
+		}
+
 		/*iframe{
 			transform: scale(0.75);
 		}*/
@@ -237,6 +243,7 @@
 				<div v-for="student in students" v-on:click="selectStudent(student)" v-bind:class="{selectedStudent: selectedStudent.dir == student.dir}">
 					<span v-if="student.grade !== ''">&checkmark;</span> {{student.dir | truncate(20)}}
 				</div>
+				<div style="text-align: center;"><button v-on:click="copyCommonFiles()">Copy Common Files</button></div>
 				<div style="text-align: center;"><button v-on:click="makeGradeFile()">Make Grade File</button></div>
 			</div>
 			<div id="infoCol">
@@ -250,6 +257,7 @@
 					<div style="display: flex; margin-bottom: .5em;">
 						<input id="pipedInput" placeholder="piped input seperated by commas" v-model="fileInput" style="width: 50%;"/>
 						<button style="margin-left: .5em;" v-on:click="runScript()">Run Script with Piped Input</button>
+						<button style="margin-left: .5em;" v-on:click="runMode = runMode == 'original' ? 'edited' : 'original'">Toggle Editor</button>
 					</div>
 					<div style="display: flex; align-items: flex-start;">
 						<textarea id="additionalCode" placeholder="additional code to append to file" v-model="additionalCode" style="width: 50%"></textarea>
@@ -257,8 +265,20 @@
 					</div>
 					<pre id="terminal" v-html="'PROGRAM OUTPUT\n'+terminal"></pre>
 
-					<div v-if="selectedStudent.selectedFile.graderHtml" v-html="selectedStudent.selectedFile.graderHtml"></div>
-					<div v-if="selectedStudent.selectedFile.html" v-html="selectedStudent.selectedFile.html"></div>
+					<div v-if="runMode == 'original'">
+						<div v-if="selectedStudent.selectedFile.graderHtml" v-html="selectedStudent.selectedFile.graderHtml"></div>
+						<div v-if="selectedStudent.selectedFile.html" v-html="selectedStudent.selectedFile.html"></div>
+					</div>
+					<div v-else>
+						<button v-on:click="runEditedScript()">Run Edited Script</button>
+						<textarea id="scriptEditor" v-model="selectedStudent.selectedFile.raw"></textarea>
+					</div>
+
+					
+					
+
+					
+					
 
 					<!-- <input id="runCommand" v-model="runCommand" style="width: 70%"/> <button v-on:click="copyRunCommand()">Copy</button>&nbsp; -->
 
@@ -286,6 +306,7 @@
 					files: [],
 					dir: "",
 					selectedFile: {
+						runOriginal: true,
 						name: "",
 						graderHtml: "",
 						html: ""
@@ -298,7 +319,9 @@
 				terminal: "",
 				additionalCode: "",
 				saving: false,
-				saved: false
+				saved: false,
+				runMode: 'original',
+				previouslySelectedFile: ''
 			},
 			computed: {
 			},
@@ -334,7 +357,7 @@
 	            		}
 		            }
 
-		            var textareas = ['studentComments', 'additionalCode'];
+		            var textareas = ['studentComments', 'additionalCode', 'scriptEditor'];
 		            var inputBoxes = ['studentGrade', 'pipedInput']
 
 		            // If textarea, return early
@@ -438,6 +461,8 @@
 				},
 				reformatName: function(name){
 					var nar = name.split(' ');
+					if (nar.length < 2)
+						return undefined;
 					var lastName = nar[1].split('_')[0]
 					var firstName = nar[0];
 					stuName = lastName+firstName.substring(0,2);
@@ -509,8 +534,6 @@
 
 							if (nextStudent.dir !== undefined)
 								savedStudents.push(nextStudent);
-
-							console.log(savedStudents);
 
 							savedStudents.forEach(function(savedStudent){
 								var stu = _.find(V.students, function(student){
@@ -609,6 +632,7 @@
 					if (this.selectedStudent.selectedFile.name.split('.').pop() == 'py')
 						V.runScript();
 
+					V.previouslySelectedFile = this.selectedStudent.selectedFile.name;
 					V.$forceUpdate();
 				},
 				processFiles: function(studentPath, files, student){
@@ -649,6 +673,11 @@
 							if (file.type === 'txt'){
 								cleaned.push(file);
 							}
+							if (file.type === 'html'){
+								if (file.name.indexOf('.py') === -1){
+									cleaned.push(file);
+								}
+							}
 
 						})
 						console.log(cleaned);
@@ -663,7 +692,15 @@
 						}
 						student.selectedFile = student.files[0];
 						V.selectedStudent = student;
-						V.selectFile(V.selectedStudent.files[0]);
+
+						// try to look at same file you were looking at for the last student
+						var match = _.findIndex(V.selectedStudent.files, {name: V.previouslySelectedFile})
+						if (match === -1 || V.previouslySelectedFile == '')
+							V.selectFile(V.selectedStudent.files[0]);
+						else
+							V.selectFile(V.selectedStudent.files[match]);
+
+						// V.selectFile(V.selectedStudent.files[0]);
 						V.$forceUpdate();
 					})
 				},
@@ -725,6 +762,21 @@
 						V.terminal = resp.data.join('\n').replace('\\n', '\n');
 					})
 				},
+				runEditedScript: function(){
+					var scriptPath = [this.hwDir, this.outputDir, this.selectedStudent.dir, this.selectedStudent.selectedFile.name].join('/')//.replace(' ', '\\ ');
+					axios({
+						method: 'post',
+						url: '/runEditedScript',
+						data: {
+							path: scriptPath,
+							input: V.fileInput.split(',').join('\n'),
+							code: V.selectedStudent.selectedFile.raw
+						}
+					}).then(function(resp){
+						console.log(resp);
+						V.terminal = resp.data.join('\n').replace('\\n', '\n');
+					})
+				},
 				makeGradeFile: function(){
 					axios({
 						method: 'post',
@@ -733,10 +785,21 @@
 							path: V.hwDir,
 						}
 					}).then(function(resp){
-						console.log(resp);
+						console.log(resp); // TODO Doesn't catch errors.
 						alert("Grade File Made!");
 					})
 				},
+				copyCommonFiles: function(){
+					axios({
+						method: 'post',
+						url: '/copyCommonFiles',
+						data: {
+							path: V.hwDir,
+						}
+					}).then(function(resp){
+						console.log(resp);
+					})
+				}
 			}
 		});
 
