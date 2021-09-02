@@ -51,10 +51,10 @@ There are three ways to edit and run student py files:
 2. With additional code appended to the end of the file (again, nice for testing)
 3. By toggling the editor, making your edits and clicking `Run Edited Script`
 
-*Note:* The appended code will persist across students (for testing purposes).
+*Note:* The appended code will persist across students (for testing purposes). Additionally, running with appended code or running an edited script also, by default, runs with piped input.
 
 ### Make Grade File
-Runs `mkgradesheet.py` which looks for a file called `moodleGrades.csv` in the HW directory. This is the grading worksheet that you can export from moodle for an assignment.
+Runs `mkgradesheet.py` which looks for a file called `moodleGrades.csv` in the HW directory. This is the grading worksheet that you can export from moodle for an assignment (View all submissions -> Grading Actions -> Download grading worksheet).
 
 ### Copy Common Files
 If there are files required to run each student's code (that aren't already included in their directories), you can use this button to copy files from a directory named `copy` in the HW directory (i.e., is a sibling to the `output` directory) to each student directory.
