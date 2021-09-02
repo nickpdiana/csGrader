@@ -1,5 +1,7 @@
 # 101 Grader
 
+![screenshot of the grader](screenshot.png)
+
 ## Purpose
 Navigate, edit, run, and grade files for COSC101 in one window and without having to leave the keyboard.
 
