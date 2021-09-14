@@ -2,12 +2,17 @@ const express = require('express')
 const app = express()
 const port = 3000
 
+const open = require('open');
 const path = require('path');
 const fs = require('fs');
 const hljs = require('highlightjs');
 const rtfToHTML = require('@iarna/rtf-to-html')
 var textract = require('textract');
-const { spawn } = require("child_process");
+// const childProcess = require('child_process')
+// const { spawn } = childProcess.spawn;
+// const { spawnSync } = childProcess.spawnSync;
+
+const { spawn, spawnSync } = require('child_process');
 
 app.use(express.static('.'))
 
@@ -62,6 +67,8 @@ app.post('/processFiles', async function(req, res){
     	}	
 
 		if (ext === 'py'){
+			if (file == 'grader.py')
+				continue;
 			o.raw = fs.readFileSync(directoryPath+"/"+file, {encoding:'utf8', flag:'r'})
 			var ret = await fs.promises.readFile(directoryPath+"/"+file, 'utf8', function(err, data) {
 				if (err) throw err;
@@ -288,8 +295,29 @@ app.post('/runEditedScript', function(req, res){
 		});
 
 	})
+});
 
-	
+app.post('/runGraderOnAll', function(req, res){
+
+	var directoryPath = req.body.path;
+
+	var rar = []
+
+	var dirs = fs.readdirSync(directoryPath+'/output', { withFileTypes: true })
+	    .filter(dirent => dirent.isDirectory())
+	    .map(dirent => dirent.name)
+
+	dirs.forEach(function(destDir){
+
+		var srcPath = req.body.path+'/grader.py';
+		var destPath = directoryPath+'/output/'+destDir+'/grader.py';
+		fs.copyFileSync(srcPath, destPath); // copy grader.py to student dir
+		
+		const ls = spawnSync("python3",  ['grader.py'], {cwd: path.dirname(destPath)});
+		fs.unlinkSync(destPath) // remove grader.py from student dir
+	})
+
+	res.send("Grader run")
 
 });
 
@@ -355,4 +383,7 @@ function convertToPlain(rtf) {
 
 app.listen(port, () => {
   console.log(`Example app listening at http://localhost:${port}`)
+  open( `http://localhost:${port}`, function (err) {
+	  if ( err ) throw err;    
+	});
 })

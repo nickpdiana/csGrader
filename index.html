@@ -49,6 +49,7 @@
 					<span v-if="student.grade !== ''">&checkmark;</span> {{student.dir | truncate(20)}}
 				</div>
 				<div style="text-align: center;"><button v-on:click="copyCommonFiles()">Copy Common Files</button></div>
+				<div style="text-align: center;"><button v-on:click="runGrader()">Run grader.py</button></div>
 				<div style="text-align: center;"><button v-on:click="makeGradeFile()">Make Grade File</button></div>
 			</div>
 			<div id="infoCol">
@@ -598,6 +599,17 @@
 					axios({
 						method: 'post',
 						url: '/copyCommonFiles',
+						data: {
+							path: V.hwDir,
+						}
+					}).then(function(resp){
+						console.log(resp);
+					})
+				},
+				runGrader: function(){
+					axios({
+						method: 'post',
+						url: '/runGraderOnAll',
 						data: {
 							path: V.hwDir,
 						}

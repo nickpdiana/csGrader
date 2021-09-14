@@ -55,6 +55,9 @@ There are three ways to edit and run student py files:
 
 *Note:* The appended code will persist across students (for testing purposes). Additionally, running with appended code or running an edited script also, by default, runs with piped input.
 
+### Using Grader Scripts
+Clicking the `Run grader.py` button will ask the software to look for a grader file called `grader.py`, copy to each student directory, run it, and then remove it from each student directory.
+
 ### Make Grade File
 Runs `mkgradesheet.py` which looks for a file called `moodleGrades.csv` in the HW directory. This is the grading worksheet that you can export from moodle for an assignment (View all submissions -> Grading Actions -> Download grading worksheet).
 
