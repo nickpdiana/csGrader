@@ -8,6 +8,7 @@ const fs = require('fs');
 const hljs = require('highlightjs');
 const rtfToHTML = require('@iarna/rtf-to-html')
 var textract = require('textract');
+var stringify = require('csv-stringify');
 // const childProcess = require('child_process')
 // const { spawn } = childProcess.spawn;
 // const { spawnSync } = childProcess.spawnSync;
@@ -18,12 +19,25 @@ app.use(express.static('.'))
 
 var bodyParser = require('body-parser');
 app.use(bodyParser.urlencoded({ extended: true }));
-app.use(bodyParser.json())
+app.use(bodyParser.json({limit: '100kb'}))
 
 app.get('/', (req, res) => {
   // res.send('Hello World!')
 
 })
+
+function save(req, res, file, dat){
+	fs.writeFile(req.body.dir+'/'+file, dat, function (err) {
+	  if (err) return console.log(err);
+	  res.send(req.body.dat);
+	});
+}
+
+function load(req, res, file){
+	fs.readFile(req.body.dir+'/'+file, function(err, data){
+			res.send(data);
+	})
+}
 
 app.post('/save', function(req, res){
 	fs.writeFile(req.body.dir+'/grades.txt', req.body.dat, function (err) {
@@ -34,8 +48,33 @@ app.post('/save', function(req, res){
 
 app.post('/load', function(req, res){
 	fs.readFile(req.body.dir+'/grades.txt', function(err, data){
-		res.send(data);
+		if (err){
+			console.log(err)
+			res.send(err)
+		}
+		else
+			res.send(data);
 	})
+})
+
+app.post('/saveRubricData', function(req, res){
+	save(req, res, 'rubric.json', req.body.dat)
+})
+
+app.post('/loadRubricData', function(req, res){
+	load(req, res, 'rubric.json')
+})
+
+app.post('/saveStudentData', function(req, res){
+	save(req, res, 'students.json', req.body.dat)
+})
+
+app.post('/loadStudentData', function(req, res){
+	load(req, res, 'students.json')
+})
+
+app.post('/loadEmailAddresses', function(req, res){
+	load(req, res, 'emailAddresses.csv')
 })
 
 app.post('/highlightFile', function(req, res){
@@ -184,36 +223,61 @@ app.post('/ls', function(req, res){
 	// res.send(JSON.stringify(rar));
 });
 
-app.post('/runScript', function(req, res){
+function runScriptWithInput(req, res, input){
+	return new Promise(function(resolve, reject){
+		const ls = spawn("python3", [req.body.path], {cwd: path.dirname(req.body.path)});
 
-	const ls = spawn("python3", [req.body.path], {cwd: path.dirname(req.body.path)});
+		console.log('')
+		console.log(`Running ${req.body.path} with piped input`);
+		console.log('------------------------------------')
 
-	console.log('')
-	console.log(`Running ${req.body.path} with piped input`);
-	console.log('------------------------------------')
+		ls.stdin.write(input);
+		ls.stdin.end();
 
-	ls.stdin.write(req.body.input);
-	ls.stdin.end();
+		var ret = [];
+		ls.stdout.on("data", data => {
+		    console.log(`${data}`);
+		    ret.push(`${data}`);
+		});
 
-	var ret = [];
-	ls.stdout.on("data", data => {
-	    console.log(`${data}`);
-	    ret.push(`${data}`);
-	});
+		ls.stderr.on("data", data => {
+		    console.log(`stderr: ${data}`);
+		});
 
-	ls.stderr.on("data", data => {
-	    console.log(`stderr: ${data}`);
-	});
+		ls.on('error', (error) => {
+		    console.log(`error: ${error.message}`);
+		});
 
-	ls.on('error', (error) => {
-	    console.log(`error: ${error.message}`);
-	});
+		ls.on("close", code => {
+		    console.log(`child process exited with code ${code}`);
+		    resolve(ret.join('\n'));
+		});
+	})
+}
 
-	ls.on("close", code => {
-	    console.log(`child process exited with code ${code}`);
-	    res.send(ret);
-	});
+app.post('/runScript', async function(req, res){
 
+	var aggRet = []
+	var runs = req.body.input.split(';')
+	let promises = [];
+
+	for (let i=0; i<runs.length; i++){
+		var inp = runs[i].split(',').join('\n');
+		console.log("Running script with:\n"+inp)
+		var ret = await runScriptWithInput(req, res, inp);
+		aggRet.push(ret);
+	}
+
+	// runs.forEach(function(run){
+	// 	var inp = run.split(',').join('\n');
+	// 	console.log("Running script with:\n"+inp)
+	// 	var ret = runScriptWithInput(req, res, inp);
+	// 	aggRet.push(ret)
+	// })
+
+	console.log("AggRet:")
+	console.log(aggRet)
+	res.send(aggRet);
 });
 
 app.post('/runScriptWithLine', function(req, res){
@@ -253,9 +317,6 @@ app.post('/runScriptWithLine', function(req, res){
 		});
 
 	})
-
-	
-
 });
 
 
@@ -321,6 +382,23 @@ app.post('/runGraderOnAll', function(req, res){
 
 });
 
+app.post('/makeGradeWorksheet', function(req, res){
+	var hwDirPath = req.body.dir;
+	console.log(hwDirPath);
+
+	stringify(req.body.dat, function(err, output) {
+	  fs.writeFile(req.body.dir+'/gradeWorksheet.csv', output, 'utf8', function(err) {
+	    if (err) {
+	      console.log('Some error occured - file either not saved or corrupted file saved.');
+	      res.send("Error saving grade worksheet");
+	    } else {
+	    	res.send('Grade worksheet saved!');
+	    }
+	  });
+	});
+
+})
+
 app.post('/makeGradeFile', function(req, res){
 
 	var hwDirPath = req.body.path;
@@ -383,7 +461,7 @@ function convertToPlain(rtf) {
 
 app.listen(port, () => {
   console.log(`Example app listening at http://localhost:${port}`)
-  open( `http://localhost:${port}`, function (err) {
-	  if ( err ) throw err;    
-	});
+ //  open( `http://localhost:${port}`, function (err) {
+	//   if ( err ) throw err;    
+	// });
 })

@@ -6,6 +6,7 @@
   "dependencies": {
     "@contentful/rich-text-plain-text-renderer": "^14.1.2",
     "@iarna/rtf-to-html": "^1.1.0",
+    "csv-stringify": "^5.6.5",
     "express": "^4.17.1",
     "fs-extra": "^9.0.1",
     "highlightjs": "^9.16.2",
