@@ -48,7 +48,7 @@
 					{{student.dir.split('_')[1]}}
 				</div>
 			</div>
-			<div id="infoCol" v-if="view == 'grade'">
+			<div id="infoCol" v-if="view == 'grade' && size(rubric) !== 0">
 				<div id="fileNav">
 					<div v-for="file in selectedStudent.files" v-on:click="selectFile(file)" v-bind:class="{selectedFile: selectedStudent.selectedFile.name == file.name}">{{file.name}}</div>
 				</div>
@@ -65,6 +65,8 @@
 							<textarea id="additionalCode" placeholder="additional code to append to file" v-model="additionalCode" style="width: 100%"></textarea>
 							<button v-on:click="runScriptWithLine()">Run Script with Additional Code</button>
 							<button v-on:click="runMode = runMode == 'original' ? 'edited' : 'original'">Toggle Editor</button>
+							<input type="checkbox" id="autoRun" v-model="autoRunMode">
+							<label for="autoRun">Auto Run w/ Add. Code</label>
 						</div>
 					</div>
 					
@@ -92,8 +94,8 @@
 
 			<!-- GRADE COL -->
 			<div id="gradeCol" v-if="view == 'grade'">
-				<select id="rubricCatSelector" v-model="selectedRubricCatID" @change="selectedRubricCat = getObjectById(rubric, selectedRubricCatID)">
-					<option v-for="cat in rubric" v-bind:value="cat.id">
+				<select id="rubricCatSelector" v-model="selectedRubricCatID" @change="selectedRubricCat = rubric[selectedRubricCatID]">
+					<option v-for="(cat,cid) in rubric" v-bind:value="cid">
 						{{ cat.name }}
 					</option>
 				</select>
@@ -105,28 +107,28 @@
 				<div id="textProgress">{{rubricCatProgress(selectedRubricCat)}} of {{students.length}} graded</div>
 
 				<div style="margin-bottom: 1.6em; font-weight: bold;">
-					{{studentCatGrade(selectedStudent, selectedRubricCat)}}/{{selectedRubricCat.points}} points
+					{{selectedStudent.rubric[selectedRubricCatID].points}}<!-- /{{selectedRubricCat.points}} points -->
 				</div>
 
-				<div class="rubricItem" v-for="(item, index) in selectedRubricCat.items">
-					<div class="rubricItemIndex" v-bind:class="{selected: isRubricItemSelected(item.id)}">{{(index+1)}}</div>
+				<div class="rubricItem" v-for="(item, itemID, index) in selectedRubricCat.items">
+					<div class="rubricItemIndex" v-bind:class="{selected: selectedStudent.rubric[selectedRubricCatID].items.indexOf(itemID) !== -1}">{{(index+1)}}</div>
 					<div>
 						<input class="rubricItemPoints" v-model="item.points">
 						<input class="rubricItemDesc" v-model="item.desc">
 					</div>
 				</div>
 				<div class="rubricItem">
-					<div class="rubricItemIndex">{{(selectedRubricCat.items.length+1)}}</div>
+					<div class="rubricItemIndex">{{(Object.keys(selectedRubricCat.items).length+1)}}</div>
 					<div>
 						<input class="rubricItemPoints" v-model="newRubricItem.points" placeholder="pts">
 						<input class="rubricItemDesc" v-model="newRubricItem.desc" placeholder="description" v-on:keyup.enter="addRubricItem(selectedRubricCat)">
 					</div>
 				</div>
 
-				<!-- <textarea id="studentCatComments" v-model="selectedStudent.rubric"></textarea> -->
+				<textarea id="studentCatComments" v-model="selectedStudent.rubric[selectedRubricCatID].comments" placeholder="problem specific comments"></textarea>
 
 				<p style="font-size: .7em;">Adjustment: <input style="width: 20%;" v-model="selectedStudent.gradeAdjustment"></p>
-				<textarea id="studentComments" v-model="selectedStudent.comments" placeholder="additional comments"></textarea>
+				<textarea id="studentComments" v-model="selectedStudent.comments" placeholder="additional or general comments"></textarea>
 
 				<select v-model="easyFeedback" @change="selectedStudent.comments += easyFeedback">
 					<option v-for="comment in studentComments" v-bind:value="comment">
@@ -158,7 +160,7 @@
 				</p>
 
 				<h3>Rubric</h3>
-				<div v-for="cat in rubric" style="margin-bottom: .5em">
+				<div v-for="(cat, cid) in rubric" style="margin-bottom: .5em">
 					<input v-model="cat.name"> <input v-model="cat.points">
 				</div>
 				<div>
@@ -167,15 +169,15 @@
 
 
 				<h3>Student Overview</h3>
-				<table id="studentOverview">
+				<table id="studentOverview" v-if="size(rubric) !== 0">
 					<tr>
 						<th>Student</th>
-						<th v-for="cat in rubric">{{cat.name}} ({{cat.points}})</th>
+						<th v-for="(cat, cid) in rubric">{{cat.name}} ({{cat.points}})</th>
 						<th>Total ({{highestPossibleGrade()}})</th>
 					</tr>
 					<tr v-for="student in students">
 						<td>{{student.dir.split('_')[0]}}</td>
-						<td v-for="cat in rubric">{{studentCatGrade(student, cat)}}</td>
+						<td v-for="(cat, cid) in rubric">{{studentCatGrade(student, cid)}}</td>
 						<td>{{studentGrade(student)}}</td>
 					</tr>
 				</table>
@@ -207,6 +209,9 @@
 						name: "",
 						graderHtml: "",
 						html: ""
+					},
+					rubric: {
+						// 'c-dummy': {items: [], points: 0, comments: ""}
 					}
 				},
 				namesNeedReformatting: false,
@@ -218,15 +223,18 @@
 				saving: false,
 				saved: false,
 				runMode: 'original',
+				autoRunMode: false,
 				previouslySelectedFile: '',
-				view: 'grade',
-				rubric: [],
+				view: 'setup',
+				rubric: {
+					// "c-dummy": {name: "Dummy", points: 0, items: {}}
+				},
 				newRubricCat: {
 					name: "",
 					points: ""
 				},
 				selectedRubricCat: { name: "", items: []},
-				selectedRubricCatID: "",
+				selectedRubricCatID: "c-dummy",
 				newRubricItem: {
 					points: "",
 					desc: ""
@@ -276,7 +284,7 @@
 	            	// 	}
 		            // }
 
-		            var textareas = ['studentComments', 'additionalCode', 'scriptEditor'];
+		            var textareas = ['studentCatComments', 'studentComments', 'additionalCode', 'scriptEditor'];
 		            var inputBoxes = ['studentGrade', 'pipedInput']
 
 		            // If textarea, return early
@@ -312,16 +320,16 @@
 		            if (['1', '2', '3', '4', '5', '6', '7', '8', '9'].indexOf(e.key) !== -1){
 		            	e.preventDefault();
 		            	var idx = parseInt(e.key)-1;
-		            	var idxID = V.selectedRubricCat.items[idx].id;
-		            	if (idx < V.selectedRubricCat.items.length){
-		            		var c = _.findWhere(V.selectedStudent.rubric, {id: V.selectedRubricCat.id});
-		            		if (c.items.indexOf(V.selectedRubricCat.items[idx].id) !== -1){ // if in list
+		            	var idxID = Object.keys(V.selectedRubricCat.items)[idx];
+		            	if (idx < Object.keys(V.selectedRubricCat.items).length){
+		            		var c = V.selectedStudent.rubric[V.selectedRubricCatID];
+		            		if (c.items.indexOf(idxID) !== -1){ // if in list
 		            			c.items = _.reject(c.items, function(x){ 
-		            				return x ==  V.selectedRubricCat.items[idx].id
+		            				return x ==  idxID
 		            			})
 		            		}
 		            		else{
-		            			c.items.push(V.selectedRubricCat.items[idx].id)
+		            			c.items.push(idxID)
 		            		}
 		            	}
 		            }
@@ -365,6 +373,10 @@
 					if (lsAdditionalCode)
 						V.additionalCode = lsAdditionalCode;
 
+					var lsPipedInput = localStorage.getItem('pipedInput');
+					if (lsPipedInput)
+						V.fileInput = lsPipedInput;
+
 					var studentFoldersPath = V.hwDir+'/'+V.outputDir;
 					console.log(studentFoldersPath);
 
@@ -398,6 +410,7 @@
 					});
 				},
 				studentDataFromScratch: function(){
+					console.log("Building student data from scratch")
 					// get all directories in output
 					var studentFoldersPath = V.hwDir+'/'+V.outputDir;
 					axios({
@@ -408,8 +421,11 @@
 						}
 					}).then(function(resp){
 						var dirs = resp.data;
+						//console.log("A")
 						dirs.forEach(function(dir){ // for each dir, create a student
+							//console.log("B")
 							if (dir[0] !== '.'){
+								// console.log("C")
 								V.students.push({
 									dir: dir,
 									// grade: '',
@@ -422,7 +438,9 @@
 
 						// V.load();
 						// V.autoSave();
+						// console.log("D")
 						V.selectStudent(V.students[0]);
+						// console.log("E")
 						V.loadEmailAddresses();
 						V.$forceUpdate();
 					})
@@ -467,7 +485,7 @@
 					}).then(function(resp){
 						console.log(resp);
 						if (resp.data !== ""){
-							console.log("Student Data Found")
+							console.log("Email Data Found")
 							var lar = resp.data.split(/\r?\n/);
 							for (var i=1; i<lar.length; i++){
 								var line = lar[i].split(',');
@@ -497,6 +515,7 @@
 				},
 				save: function(){
 					V.saving = true;
+					V.updateLS();
 					V.saveStudentData(function(){
 						V.saveRubricData(function(){
 							V.saving = false;
@@ -590,6 +609,7 @@
 					localStorage.setItem('emailAddressPath', V.emailAddressPath);
 					localStorage.setItem('namesNeedReformatting', JSON.stringify(V.namesNeedReformatting));
 					localStorage.setItem('additionalCode', V.additionalCode);
+					localStorage.setItem('pipedInput', V.fileInput);
 				},
 				copyRunCommand: function(){
 					document.getElementById('runCommand').select();
@@ -662,7 +682,10 @@
 					}
 
 					if (this.selectedStudent.selectedFile.name.split('.').pop() == 'py')
-						V.runScript();
+						if (V.autoRunMode)
+							V.runScriptWithLine()
+						else
+							V.runScript();
 
 					V.previouslySelectedFile = this.selectedStudent.selectedFile.name;
 					V.$forceUpdate();
@@ -724,6 +747,11 @@
 						}
 						student.selectedFile = student.files[0];
 						V.selectedStudent = student;
+
+						// if (V.selectedStudent.rubric == undefined){
+						// 	V.selectedStudent.rubric = {'c-dummy': {items: [], points: 0, comments: ""}}
+						// 	// V.view = "setup"
+						// }
 
 						// try to look at same file you were looking at for the last student
 						var match = _.findIndex(V.selectedStudent.files, {name: V.previouslySelectedFile})
@@ -846,46 +874,44 @@
 				// Rubric
 				addRubricCat: function(){
 					var d = new Date();
+					var id =  'c-'+d.getTime();
 					var nr = {
-						id: 'c-'+d.getTime(),
+						id: id,
 						name: V.newRubricCat.name,
-						items: [{ id: 'i'+d.getTime(), points: 0, desc: "Full credit" }],
+						items: {},
 						points: V.newRubricCat.points
 					}
+					nr.items['i-'+d.getTime()] = {points: 0, desc: "Full credit" };
 
-					V.rubric.push(nr)
+					V.rubric[id] = nr;
 
 					// update student data with new rubric category
 					V.students.forEach(function(student){
 						if (student.rubric == undefined){
-							student.rubric = []
+							student.rubric = {}
 						}
-						student.rubric.push({
-							id: nr.id,
+						student.rubric[id] = {
 							items: [],
-							comments: []
-						})
+							comments: ""
+						}
 					})
-					console.log(V.students[0])
 
 					V.newRubricCat.name = "";
 					V.newRubricCat.points = "";
 				},
-				removeRubricCat: function(cat){
+				removeRubricCat: function(catID){
 					var c = window.confirm("Are you sure you want to delete this rubric category?")
 					if (c){
-						var idx = V.rubric.findIndex(p => p.id==cat.id);
-						var removed = V.rubric.splice(idx,1);
-
-						V.students.forEach(function(student){
-							var idx = student.rubric.findIndex(p => p.id==cat.id);
-							var removed = student.rubric.splice(idx,1);
-						})
+						delete V.rubric[catID]
+						V.students.forEach(function(student){ delete student.rubric[catID]; })
 					}
 				},
 				addRubricItem: function(cat){
 					var d = new Date();
-					cat.items.push({ id: 'i'+d.getTime(), points: V.newRubricItem.points, desc: V.newRubricItem.desc })
+					var id = 'i'+d.getTime()
+					
+					cat.items[id] = { points: V.newRubricItem.points, desc: V.newRubricItem.desc };
+
 					V.newRubricItem.points = ""
 					V.newRubricItem.desc = ""
 				},
@@ -916,9 +942,9 @@
 						console.log(resp)
 						if (resp.data !== ""){
 							V.rubric = resp.data;
-							if (V.rubric.length > 0){
-								V.selectedRubricCat = V.rubric[0]
-								V.selectedRubricCatID = V.selectedRubricCat.id;
+							if (_.size(V.rubric) > 0){
+								V.selectedRubricCat = V.rubric[_.keys(V.rubric)[0]] // not great
+								V.selectedRubricCatID = _.keys(V.rubric)[0]
 							}
 						}
 
@@ -926,15 +952,16 @@
 							callback();
 					})
 				},
-				studentCatGrade: function(stu, cat){
+				studentCatGrade: function(stu, cid){
+					var cat = V.rubric[cid];
 					var catGrade = parseFloat(cat.points);
-					var stuCat = _.findWhere(stu.rubric, {id: cat.id})
+					var stuCat = stu.rubric[cid]
 					if (stuCat == undefined)
 						return "-";
 					if (stuCat.items.length == 0)
 						return "-"
 					stuCat.items.forEach(function(itemID){
-						var itemObj = V.getObjectById(cat.items, itemID)
+						var itemObj = cat.items[itemID]
 						catGrade += parseFloat(itemObj.points)
 					})
 					return catGrade;
@@ -944,13 +971,14 @@
 					var grade = 0;
 					if (student.rubric === undefined)
 						return "-"
-					student.rubric.forEach(function(cat){
-						var rubObj = V.getObjectById(V.rubric, cat.id)
+					Object.keys(student.rubric).forEach(function(cid){
+						var cat = student.rubric[cid]
+						var rubObj = V.rubric[cid]
 						var catGrade = parseFloat(rubObj.points);
 
 						cat.items.forEach(function(itemID){
 
-							var itemObj = V.getObjectById(rubObj.items, itemID)
+							var itemObj = rubObj.items[itemID]
 							catGrade += parseFloat(itemObj.points)
 						})
 
@@ -960,8 +988,8 @@
 				},
 				highestPossibleGrade: function(){
 					var pts = 0;
-					V.rubric.forEach(function(cat){
-						pts += parseFloat(cat.points);
+					Object.keys(V.rubric).forEach(function(cid){
+						pts += parseFloat(V.rubric[cid].points);
 					})
 					return pts;
 				},
@@ -969,11 +997,15 @@
 					if (V == undefined)
 						return 0;
 					return _.filter(V.students, function(stu){
-						var stuCat = V.getObjectById(stu.rubric, cat.id)
-						if (stuCat && stuCat.items.length > 0)
-							return true;
+						if (stu.rubric){
+							var stuCat = stu.rubric[cat.id]
+							if (stuCat && _.size(stuCat.items) > 0)
+								return true;
+							else
+								return false
+						}
 						else
-							return false
+							return false;
 					}).length;
 				},
 				makeGradeWorksheet: function(callback){
@@ -993,13 +1025,14 @@
 						var grade = 0;
 
 						// computing grades
-						student.rubric.forEach(function(cat){
-							var rubObj = V.getObjectById(V.rubric, cat.id)
+						Object.keys(student.rubric).forEach(function(cid){
+							var rubObj = V.rubric[cid]
 							var catGrade = parseFloat(rubObj.points);
+							var cat = student.rubric[cid];
 
 							cat.items.forEach(function(itemID){
 
-								var itemObj = V.getObjectById(rubObj.items, itemID)
+								var itemObj = rubObj.items[itemID]
 								catGrade += parseFloat(itemObj.points)
 								if (parseFloat(itemObj.points) < 0){
 									autoFeedback += `${rubObj.name}: ${itemObj.points} pts for ${itemObj.desc}.  \n`;
@@ -1051,6 +1084,12 @@
 						return cat.items.indexOf(id) !== -1;
 					else
 						return false;
+				},
+				size: function(ob){
+					return Object.keys(ob).length;
+				},
+				isEmpty: function(ob){
+
 				}
 			}
 		});

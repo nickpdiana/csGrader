@@ -95,6 +95,10 @@ pre{
 	white-space: pre-wrap; 
 }
 
+#additionalCode{
+	font-family: 'Inconsolata', monospace;
+}
+
 #assessmentContain{
 	position: fixed;
 	bottom: 1em;
@@ -115,7 +119,7 @@ pre{
 		color: var(--accent);
 	}
 
-	#studentComments{
+	#studentComments, #studentCatComments{
 		display: block;
 		width: 100%;
 		min-height: 200px;
