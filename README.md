@@ -49,7 +49,7 @@ Escape = Exit **Grade Input** or **Comment Input** (re-enable other shortcuts)
 Student code is often *almost* functional. Editing allows us to test the code with minor corrections, so that we can know if the problem is a small grammatical issue, or a larger conceptual one.
 
 There are three ways to edit and run student py files:
-1. With piped standard input (nice for testing)
+1. With piped standard input (nice for testing). Separate inputs by comma. You can also separate runs of different inputs with a semi-colon.
 2. With additional code appended to the end of the file (again, nice for testing)
 3. By toggling the editor, making your edits and clicking `Run Edited Script`
 
