@@ -329,6 +329,15 @@ pre{
 		text-align: left;
 	}
 
+#docxContain img{
+	max-width: 100%;
+}
+
+#embededPDF{
+	height: 90vh;
+	width: 100%;
+}
+
 table.diff {font-family:Courier; border:medium;}
 .diff_header {background-color:#e0e0e0}
 td.diff_header {text-align:right}

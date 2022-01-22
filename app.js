@@ -4,11 +4,12 @@ const port = 3000
 
 const open = require('open');
 const path = require('path');
-const fs = require('fs');
+const fs = require('fs-extra');
 const hljs = require('highlightjs');
 const rtfToHTML = require('@iarna/rtf-to-html')
 var textract = require('textract');
 var stringify = require('csv-stringify');
+const mammoth = require('mammoth');
 // const childProcess = require('child_process')
 // const { spawn } = childProcess.spawn;
 // const { spawnSync } = childProcess.spawnSync;
@@ -153,6 +154,34 @@ app.post('/processFiles', async function(req, res){
 			o.html = '<pre>'+ret+'</pre>';
 			// o.type = 'txt'
 			// o.html = '<pre>'+convertToPlain(ret);+'</pre>'
+		}
+		if (ext === 'pdf'){
+
+				var srcPath = directoryPath+"/"+file;
+				var destPath = 'tmp.pdf'
+				// fs.copyFileSync(srcPath, destPath);
+
+				if (fs.existsSync('stuDir'))
+					fs.unlinkSync('stuDir')
+				fs.symlinkSync(directoryPath, 'stuDir', 'dir')
+
+				o.type = "html"
+				o.html = `<embed id="embededPDF" src="${"stuDir/"+encodeURIComponent(file)}" />`
+		}
+		if (ext === 'docx'){
+			var ret = await new Promise((resolve, reject) => {
+
+				mammoth.convertToHtml({path: directoryPath+"/"+file})
+		    .then(function(result){
+		        var html = result.value; // The generated HTML
+		        // var messages = result.messages; // Any messages, such as warnings during conversion
+		        resolve(html)
+		    })
+		    .done();
+
+			})
+			o.type = 'html'
+			o.html = '<div id="docxContain">'+ret+'</div>';
 		}
 		rar.push(o);
     };
@@ -438,13 +467,22 @@ app.post('/copyCommonFiles', function(req, res){
 	    .map(dirent => dirent.name)
 
 	dirs.forEach(function(destDir){
-		var files = fs.readdirSync(directoryPath+'/copy')
+		// var files = fs.readdirSync(directoryPath+'/copy')
 
-		files.forEach(function(file){
-			var srcPath = req.body.path+'/copy/'+file;
-			var destPath = directoryPath+'/output/'+destDir+'/'+file;
-			fs.copyFileSync(srcPath, destPath);
-		})
+		// files.forEach(function(file){
+		// 	var srcPath = req.body.path+'/copy/'+file;
+		// 	var destPath = directoryPath+'/output/'+destDir+'/'+file;
+		// 	fs.copyFileSync(srcPath, destPath);
+		// })
+
+		var source = req.body.path+'copy';
+		var destination = directoryPath+'/output/'+destDir;
+		try {
+			fs.copySync(source, destination)
+			console.log("Success!")
+		} catch (err){
+			console.error(err)
+		}
 	})
 	res.send('Files copied!');
 

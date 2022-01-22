@@ -42,10 +42,10 @@
 					<!-- <div style="width: 20%;"></div> -->
 				</div>
 
-				<div class="studentColRow" v-for="student in students" v-on:click="selectStudent(student)" v-bind:class="{selectedStudent: selectedStudent.dir == student.dir}">
+				<div class="studentColRow" v-for="student in students" v-on:click="selectStudent(student); view = 'grade'" v-bind:class="{selectedStudent: selectedStudent.dir == student.dir}">
 					<!-- <span v-if="student.grade !== ''">&checkmark;</span>  -->
 					<!-- {{student.dir | truncate(20)}} -->
-					{{student.dir.split('_')[1]}}
+					{{student.dir.split('_')[anonymize]}}
 				</div>
 			</div>
 			<div id="infoCol" v-if="view == 'grade' && size(rubric) !== 0">
@@ -56,7 +56,7 @@
 					
 					<!-- <textarea v-model="pipedInput" style=""></textarea> -->
 
-					<div style="display: flex; margin-bottom: .5em;">
+					<div v-if="selectedStudent.selectedFile.type == 'py'" style="display: flex; margin-bottom: .5em;">
 
 						<pre id="terminal" v-html="'PROGRAM OUTPUT\n'+terminal"></pre>
 						<div id="scriptOptions">
@@ -157,6 +157,7 @@
 					<button v-on:click="copyCommonFiles()">Copy Common Files</button>
 					<button v-on:click="runGrader()">Run grader.py</button>
 					<button v-on:click="makeGradeWorksheet()">Make Grade Worksheet</button>
+					<button v-on:click="anonymize = anonymize == 0 ? 1 : 0">Toggle Anonymity</button>
 				</p>
 
 				<h3>Rubric</h3>
@@ -164,7 +165,7 @@
 					<input v-model="cat.name"> <input v-model="cat.points">
 				</div>
 				<div>
-					<input placeholder="New Rubric Category" v-model="newRubricCat.name"> <input placeholder="pts" v-model="newRubricCat.points" type="number" v-on:keyup.enter="addRubricCat()">
+					<input id="newRubricCategoryInp" placeholder="New Rubric Category" v-model="newRubricCat.name"> <input placeholder="pts" v-model="newRubricCat.points" type="number" v-on:keyup.enter="addRubricCat()">
 				</div>
 
 
@@ -239,7 +240,8 @@
 					points: "",
 					desc: ""
 				},
-				easyFeedback: ""
+				easyFeedback: "",
+				anonymize: 0
 			},
 			computed: {
 				studentComments: function(){
@@ -305,6 +307,36 @@
 		                console.log("NEXT STUDENT");
 		                e.preventDefault();
 		                V.nextStudent();
+		            }
+		            if (e.key === "]") {
+		                console.log("NEXT RUBRIC CATEGORY");
+		                e.preventDefault();
+
+		                var match = 0;
+		                for (var i = 0; i < Object.keys(V.rubric).length; i++) {
+		                	if (Object.keys(V.rubric)[i] == V.selectedRubricCatID)
+		                		match = i + 1;
+		                }
+		                if (match >= Object.keys(V.rubric).length)
+		                	match = 0
+
+		                V.selectedRubricCatID = Object.keys(V.rubric)[match]
+		                V.selectedRubricCat = V.rubric[V.selectedRubricCatID]
+		            }
+		            if (e.key === "[") {
+		                console.log("PREV RUBRIC CATEGORY");
+		                e.preventDefault();
+
+		                var match = 0;
+		                for (var i = 0; i < Object.keys(V.rubric).length; i++) {
+		                	if (Object.keys(V.rubric)[i] == V.selectedRubricCatID)
+		                		match = i - 1;
+		                }
+		                if (match < 0)
+		                	match = Object.keys(V.rubric).length-1;
+
+		                V.selectedRubricCatID = Object.keys(V.rubric)[match]
+		                V.selectedRubricCat = V.rubric[V.selectedRubricCatID]
 		            }
 
 		            // If inputs, check for up or down, then return
@@ -898,6 +930,7 @@
 
 					V.newRubricCat.name = "";
 					V.newRubricCat.points = "";
+					$('#newRubricCategoryInp').focus()
 				},
 				removeRubricCat: function(catID){
 					var c = window.confirm("Are you sure you want to delete this rubric category?")
