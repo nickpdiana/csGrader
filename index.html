@@ -144,6 +144,16 @@
 
 				<h2>Setup</h2>
 
+				Course: <select v-model="selectedCourse">
+					<option v-for="option in courses">{{option.name}}</option>
+				</select>
+
+				<button v-on:click="showAddCourse = !showAddCourse">Add New Course</button>
+				<div v-if="showAddCourse">
+					<input v-model="newCourse.name" placeholder="Course Name">
+					<input v-model="newCourse.dir" placeholder="Directory">
+				</div>
+
 				<h3>Files and Directories</h3>
 				<p>
 					HW Directory: <input v-model="hwDir" style="width: 80%;" />
@@ -186,7 +196,7 @@
 		</div>
 	</div>
 
-	<script src="https://unpkg.com/vue"></script>
+	<script src="https://cdn.jsdelivr.net/npm/vue@2.6.14"></script>
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.9.1/underscore-min.js"></script>
 	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
 	<script type="text/javascript">
@@ -196,6 +206,10 @@
 		var V = new Vue({
 			el: '#mainContain',
 			data: {
+				courses: [],
+				selectedCourse: {},
+				showAddCourse: false,
+				newCourse: {name: '', dir: ''},
 				hwDir: '/Users/ndiana/Documents/Classes/Fall2020/COSC101L/grading/prelab4',
 				emailAddressPath: '/Users/ndiana/',
 				outputDir: 'output',
