@@ -52,17 +52,24 @@ input, textarea{
 
 button{
 	padding: .5em;
-	background: var(--light-base);
+	/*background: var(--light-base);*/
 	border: 0;
 	border: 1px solid var(--light-base);
 	color: var(--accent-text);
-	border-radius: .3em;
+	/*border-radius: .3em;*/
+	transition: all 0.2s ease;
 }
 	button:hover{
 		cursor: pointer;
-		background: var(--accent);
+		/*background: var(--accent);*/
 		border: 1px solid var(--accent);
-		color: var(--light-background);
+		color: var(--accent);
+	}
+
+	.selectedBtn{
+		/*background: var(--accent);*/
+		color: var(--accent);
+		border: 1px solid var(--accent);
 	}
 
 #mainContain{position: relative;}
@@ -79,6 +86,7 @@ button{
 	background: var(--base);
 	color: var(--light-background);
 	align-items: center;
+	height: 200px;
 }
 
 	#saveBtn{
@@ -126,9 +134,15 @@ pre{
 	}
 
 #studentCol{
-	width: 15%;
+	width: 10%;
 	border-right: 1px solid rgba(7, 13, 89,0.1);
 }
+
+	#studentColRows{
+		overflow-y: scroll;
+		height: calc(100vh - 200px);
+		font-size: .8em;
+	}
 
 	#studentCol .studentColRow{
 		padding: .75em 1em;
@@ -146,9 +160,9 @@ pre{
 	}
 
 #infoCol{
-	width: 65%;
+	width: 70%;
 	padding: 0em 0em;
-	margin-bottom: 300px;
+	/*margin-bottom: 300px;*/
 }
 
 #setupCol{
@@ -160,6 +174,8 @@ pre{
 	width: 20%;
 	padding: 1em;
 	background: var(--light-background2);
+	overflow-y: scroll;
+	height: 100vh;
 }
 	#rubricCatSelector{
 		font-size: 2em;
@@ -243,7 +259,6 @@ pre{
 	flex-wrap: nowrap;
 	/*justify-content: space-around;*/
 	justify-content: stretch;
-	margin-bottom: 1em;
 	border-bottom: 1px solid rgba(7, 13, 89,0.1);
 }
 	#fileNav > div{
@@ -269,7 +284,9 @@ pre{
 	}
 
 #fileContain{
-	padding: 0em 1em;
+	padding: 0em;
+	height: calc(100vh - 35px);
+	overflow-y: scroll;
 }
 
 #terminal{
@@ -277,12 +294,12 @@ pre{
 	color: var(--light-background);
 	padding: 1em;
 	margin: 0 0 0 0;
-	width: 50%;
+	width: 100%;
 }
 #scriptOptions{
-	padding: 0 1em 1em 1em;
+	padding: 1em 1em 1em 1em;
 	margin: 0 0 0 0;
-	width: 50%;
+	width: 100%;
 }
 	#scriptOptions input, #scriptOptions textarea{
 		margin-bottom: .5em;
@@ -336,6 +353,44 @@ pre{
 #embededPDF{
 	height: 90vh;
 	width: 100%;
+}
+
+.saQuestion{
+	padding: 1em;
+}
+
+.questionText, .textResponse{
+	line-height: 1.6em;
+}
+
+.questionText{
+	font-weight: bold;
+	margin-bottom: 1em;
+}
+
+.CodeMirror{
+	height: 90vh !important;
+}
+
+.htmlPreview{
+	width: 50%;
+	height: 90vh;
+}
+
+.handler {
+  width: 20px;
+  padding: 0;
+  cursor: ew-resize;
+  flex: 0 0 auto;
+}
+
+.handler::before {
+  content: '';
+  display: block;
+  width: 4px;
+  height: 100%;
+  background: red;
+  margin: 0 auto;
 }
 
 table.diff {font-family:Courier; border:medium;}

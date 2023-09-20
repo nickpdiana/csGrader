@@ -2,7 +2,11 @@
 <html>
 <head>
 	<meta charset="utf-8">
-	<title></title>
+	<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+	<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+	<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+	<link rel="manifest" href="/site.webmanifest">
+	<title>Grader</title>
 	<link rel="stylesheet" href="highlight/styles/default.css">
 	<!-- <script src="highlight/highlight.pack.js"></script>
 	<script>hljs.initHighlightingOnLoad();</script> -->
@@ -10,6 +14,12 @@
 	<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
 	<!-- <script src="https://kit.fontawesome.com/25d307a19a.js" crossorigin="anonymous"></script> -->
 	<link rel="stylesheet" type="text/css" href="style.css">
+	<script src="codemirror-5.65.3/lib/codemirror.js"></script>
+	<link rel="stylesheet" href="codemirror-5.65.3/lib/codemirror.css">
+	<script src="codemirror-5.65.3/mode/javascript/javascript.js"></script>
+	<script src="codemirror-5.65.3/mode/python/python.js"></script>
+	<script src="https://cdn.plot.ly/plotly-2.14.0.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/showdown/2.1.0/showdown.min.js" integrity="sha512-LhccdVNGe2QMEfI3x4DVV3ckMRe36TfydKss6mJpdHjNFiV07dFpS2xzeZedptKZrwxfICJpez09iNioiSZ3hA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 </head>
 <body>
 
@@ -28,24 +38,29 @@
 		<div id="mainCols">
 			<div id="studentCol">
 				<div id="nav">
-					<h1>101 Grader</h1>
-					<div style="display: flex; justify-content: space-around;">
-						<button v-on:click="view = 'setup'">Settings</button>
-						<button v-on:click="view = 'grade'">Grade</button>
+					<h1>Grader</h1>
+					<div style="display: flex; justify-content: space-around; margin-bottom: .5em">
+						<button v-on:click="view = 'setup'; drawGradeChart();">Setup</button>
+						<button v-on:click="view = 'grade';">Grade</button>
+					</div>
+					<div style="text-align:center;">
 						<button id="saveBtn" v-on:click="save()">
 							<span v-if="saving">Saving</span>
 							<span v-else>Save</span>
 						</button>
+						<div style="font-size: .8em">{{lastSaved}}</div>
+						<input type="checkbox" id="autoRun" v-model="autoRunMode" tooltip="">
+						<input type="checkbox" id="autoRun" v-model="testingSuite">
 					</div>
-					
 					<!-- <div><button v-on:click="save()">Save</button></div> -->
 					<!-- <div style="width: 20%;"></div> -->
 				</div>
-
+				<div id="studentColRows">
 				<div class="studentColRow" v-for="student in students" v-on:click="selectStudent(student); view = 'grade'" v-bind:class="{selectedStudent: selectedStudent.dir == student.dir}">
 					<!-- <span v-if="student.grade !== ''">&checkmark;</span>  -->
 					<!-- {{student.dir | truncate(20)}} -->
-					{{student.dir.split('_')[anonymize]}}
+					{{student.dir.split('_')[anonymize]}} ({{studentGrade(student)}})
+				</div>
 				</div>
 			</div>
 			<div id="infoCol" v-if="view == 'grade' && size(rubric) !== 0">
@@ -56,30 +71,44 @@
 					
 					<!-- <textarea v-model="pipedInput" style=""></textarea> -->
 
-					<div v-if="selectedStudent.selectedFile.type == 'py'" style="display: flex; margin-bottom: .5em;">
+					<div style="display: flex; margin-bottom: .5em;">
 
-						<pre id="terminal" v-html="'PROGRAM OUTPUT\n'+terminal"></pre>
+						<div style="resize: horizontal; width: 50%; flex: 1 1 auto;" v-show="selectedStudent.selectedFile.type === 'py'"><textarea id="scriptEditor"></textarea></div>
+						
+						<div class="htmlPreview" v-if="selectedStudent.selectedFile.type !== 'py'" v-html="selectedStudent.selectedFile.html" style="width: 100%"></div>
+						<!-- <div class="handler"></div> -->
+						<div v-show="selectedStudent.selectedFile.type === 'py'" style="width: 50%; flex: 1 1 auto;">
+<!-- 						<pre id="terminal">
+PROGRAM OUTPUT
+{{terminal}}</pre> -->
+						<pre id="terminal" v-html="terminal"></pre>
 						<div id="scriptOptions">
-							<input id="pipedInput" placeholder="piped input seperated by commas" v-model="fileInput" style="width: 100%;" v-on:keyup.enter="runScript();"/>
-							<button v-on:click="runScript()">Run Script with Piped Input</button>
+							<input id="pipedInput" placeholder="piped input seperated by commas" v-model="fileInput" style="width: 100%;" v-on:keyup.enter="runEditedScript();"/>
+<!-- 							<button v-on:click="runEditedScript()">Run Script with Piped Input</button>
+ -->							
 							<textarea id="additionalCode" placeholder="additional code to append to file" v-model="additionalCode" style="width: 100%"></textarea>
-							<button v-on:click="runScriptWithLine()">Run Script with Additional Code</button>
-							<button v-on:click="runMode = runMode == 'original' ? 'edited' : 'original'">Toggle Editor</button>
+							<textarea id="scratchPad" placeholder="scratch pad" v-model="scratchPad" style="width: 100%; resize: vertical"></textarea>
+							<button v-on:click="runEditedScript()">Run Script</button> <button v-on:click="openTerminalAtDir()">Open Terminal</button>
+							<!-- <button v-on:click="runMode = runMode == 'original' ? 'edited' : 'original'">Toggle Editor</button>
 							<input type="checkbox" id="autoRun" v-model="autoRunMode">
-							<label for="autoRun">Auto Run w/ Add. Code</label>
+							<label for="autoRun">Auto Run w/ Add. Code</label> -->
 						</div>
+						</div>
+
+						
 					</div>
 					
 					
+					<!-- <textarea v-model="selectedStudent.selectedFile.raw" id="selectedFileContain"></textarea> -->
 
-					<div v-if="runMode == 'original'">
+					<!-- <div v-if="runMode == 'original'">
 						<div v-if="selectedStudent.selectedFile.graderHtml" v-html="selectedStudent.selectedFile.graderHtml"></div>
 						<div v-if="selectedStudent.selectedFile.html" v-html="selectedStudent.selectedFile.html"></div>
-					</div>
-					<div v-else>
-						<button v-on:click="runEditedScript()">Run Edited Script</button>
-						<textarea id="scriptEditor" v-model="selectedStudent.selectedFile.raw"></textarea>
-					</div>
+					</div> -->
+					<!-- <div v-else> -->
+						<!-- <button v-on:click="runEditedScript()">Run Edited Script</button> -->
+						
+					<!-- </div> -->
 
 					
 					
@@ -96,7 +125,7 @@
 			<div id="gradeCol" v-if="view == 'grade'">
 				<select id="rubricCatSelector" v-model="selectedRubricCatID" @change="selectedRubricCat = rubric[selectedRubricCatID]">
 					<option v-for="(cat,cid) in rubric" v-bind:value="cid">
-						{{ cat.name }}
+						{{ cat.name }} ({{cat.points}})
 					</option>
 				</select>
 
@@ -114,14 +143,14 @@
 					<div class="rubricItemIndex" v-bind:class="{selected: selectedStudent.rubric[selectedRubricCatID].items.indexOf(itemID) !== -1}">{{(index+1)}}</div>
 					<div>
 						<input class="rubricItemPoints" v-model="item.points">
-						<input class="rubricItemDesc" v-model="item.desc">
+						<textarea class="rubricItemDesc" v-model="item.desc"></textarea>
 					</div>
 				</div>
 				<div class="rubricItem">
 					<div class="rubricItemIndex">{{(Object.keys(selectedRubricCat.items).length+1)}}</div>
 					<div>
 						<input class="rubricItemPoints" v-model="newRubricItem.points" placeholder="pts">
-						<input class="rubricItemDesc" v-model="newRubricItem.desc" placeholder="description" v-on:keyup.enter="addRubricItem(selectedRubricCat)">
+						<textarea class="rubricItemDesc" v-model="newRubricItem.desc" placeholder="description" v-on:keyup.enter="addRubricItem(selectedRubricCat)"></textarea>
 					</div>
 				</div>
 
@@ -144,23 +173,35 @@
 
 				<h2>Setup</h2>
 
-				Course: <select v-model="selectedCourse">
-					<option v-for="option in courses">{{option.name}}</option>
-				</select>
+				<!-- Course: <select v-model="selectedCourseName">
+					<option v-for="option in courses" v-bind:value="option">{{option.name}}</option>
+				</select> -->
 
-				<button v-on:click="showAddCourse = !showAddCourse">Add New Course</button>
+				<div style="display: flex;">
+					<button v-for="course in courses" style="margin-right: 1em" v-bind:class="{'selectedBtn': selectedCourse.name == course.name}" v-on:click="selectedCourse = course; loadHWDirs();">{{course.name}}</button>
+					<!-- <button v-on:click="showAddCourse = !showAddCourse">Add New Course</button> -->
+				</div>
+
+				<div style="display: flex; margin-top: 1em">
+					<button v-for="dir in hwDirs" style="margin-right: 1em" v-bind:class="{'selectedBtn': hwDir == dir.name}" v-on:click="hwDir = dir.name; loadStudentData()">{{dir.name}}</button>
+				</div>
+
+				
 				<div v-if="showAddCourse">
 					<input v-model="newCourse.name" placeholder="Course Name">
 					<input v-model="newCourse.dir" placeholder="Directory">
+					<button v-on:click="addNewCourse()">Add</button>
 				</div>
 
-				<h3>Files and Directories</h3>
-				<p>
-					HW Directory: <input v-model="hwDir" style="width: 80%;" />
-				</p>
-				<p>
+				<!-- <h3>Files and Directories</h3>
+				<p>Course Name: <input v-model="selectedCourse.name" style="width: 50%;" /></p>
+				<p>Course Directory: <input v-model="selectedCourse.dir" style="width: 50%;" /></p>
+				<p>HW Directory: <input v-model="hwDir" style="width: 20%;" />
+					<button v-on:click="updateLS()">Save</button>
+				</p> -->
+<!-- 				<p>
 					Path to Email Addresses: <input v-model="emailAddressPath" style="width: 80%;" />
-				</p>
+				</p> -->
 				<!-- <p>Names Need Reformatting: <input type="checkbox" v-model="namesNeedReformatting"></p> -->
 				<p>
 					<button v-on:click="reload()">Reload</button>
@@ -170,12 +211,20 @@
 					<button v-on:click="anonymize = anonymize == 0 ? 1 : 0">Toggle Anonymity</button>
 				</p>
 
+				
+
 				<h3>Rubric</h3>
-				<div v-for="(cat, cid) in rubric" style="margin-bottom: .5em">
-					<input v-model="cat.name"> <input v-model="cat.points">
-				</div>
-				<div>
-					<input id="newRubricCategoryInp" placeholder="New Rubric Category" v-model="newRubricCat.name"> <input placeholder="pts" v-model="newRubricCat.points" type="number" v-on:keyup.enter="addRubricCat()">
+				<div style="display: flex">
+					<div style="width: 50%">
+						<div v-for="(cat, cid) in rubric" style="margin-bottom: .5em">
+							<input v-model="cat.name"> <input v-model="cat.points">
+						</div>
+						<div>
+							<input id="newRubricCategoryInp" placeholder="New Rubric Category" v-model="newRubricCat.name"> <input placeholder="pts" v-model="newRubricCat.points" type="number" v-on:keyup.enter="addRubricCat()">
+						</div>
+					</div>
+					<div id="gradeChart" style="width:50%;height:400px;"></div>
+
 				</div>
 
 
@@ -199,18 +248,23 @@
 	<script src="https://cdn.jsdelivr.net/npm/vue@2.6.14"></script>
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.9.1/underscore-min.js"></script>
 	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+	<script src="ansi_up.js"></script>
 	<script type="text/javascript">
 		
 		var dat;
 
+		var ansi_up = new AnsiUp;
+
 		var V = new Vue({
 			el: '#mainContain',
 			data: {
+				cm: null,
 				courses: [],
+				hwDirs: [],
 				selectedCourse: {},
 				showAddCourse: false,
 				newCourse: {name: '', dir: ''},
-				hwDir: '/Users/ndiana/Documents/Classes/Fall2020/COSC101L/grading/prelab4',
+				hwDir: 'HW01',
 				emailAddressPath: '/Users/ndiana/',
 				outputDir: 'output',
 				students: [],
@@ -237,8 +291,9 @@
 				additionalCode: "",
 				saving: false,
 				saved: false,
+				lastSaved: '',
 				runMode: 'original',
-				autoRunMode: false,
+				autoRunMode: true,
 				previouslySelectedFile: '',
 				view: 'setup',
 				rubric: {
@@ -255,9 +310,14 @@
 					desc: ""
 				},
 				easyFeedback: "",
-				anonymize: 0
+				anonymize: 0,
+				scratchPad: "",
+				testingSuite: false
 			},
 			computed: {
+				hwPath: function(){
+					return V.selectedCourse.dir+'/Grading/'+V.hwDir;
+				},
 				studentComments: function(){
 					if (V == undefined)
 						return [];
@@ -304,7 +364,7 @@
 		            var inputBoxes = ['studentGrade', 'pipedInput']
 
 		            // If textarea, return early
-		            if (textareas.indexOf(document.activeElement.id) !== -1){
+		            if (textareas.indexOf(document.activeElement.id) !== -1 || document.activeElement.tagName == 'TEXTAREA'){
 		            	if (e.key === "Escape") {
 		            		e.preventDefault();
 		            		document.activeElement.blur();
@@ -402,13 +462,39 @@
 			methods: {
 				init: function(){
 
+					// var myCodeMirror = CodeMirror(document.body);
+
+					// var lsCourses = localStorage.getItem('courses');
+					// if (lsCourses)
+					// 	V.courses = JSON.parse(lsCourses);
+					// else{
+						axios({
+							method: 'post',
+							url: '/getDirectories',
+							data: {
+								parent: '/Users/ndiana/Google Drive/Courses'
+							}
+						}).then(function(resp){
+							console.log(resp);
+							V.courses = resp.data.map(x => { return {name: x.split('/').pop(), dir: x }});
+						});
+					//}
+
+					if (V.courses.length > 0){
+						var selectedCourseIdx = localStorage.getItem('selectedCourseIdx');
+						if (selectedCourseIdx)
+							V.selectedCourse = V.courses[selectedCourseIdx];
+						else
+							V.selectedCourse = V.courses[0];
+					}
+
 					var lsHWDir = localStorage.getItem('hwDir');
 					if (lsHWDir)
 						V.hwDir = lsHWDir;
 
-					var lsEmails = localStorage.getItem('emailAddressPath');
-					if (lsEmails)
-						V.emailAddressPath = lsEmails;
+					// var lsEmails = localStorage.getItem('emailAddressPath');
+					// if (lsEmails)
+					// 	V.emailAddressPath = lsEmails;
 
 					var lsNamesNeedReformatting = localStorage.getItem('namesNeedReformatting');
 					if (lsNamesNeedReformatting && lsNamesNeedReformatting !== null){
@@ -423,22 +509,37 @@
 					if (lsPipedInput)
 						V.fileInput = lsPipedInput;
 
-					var studentFoldersPath = V.hwDir+'/'+V.outputDir;
-					console.log(studentFoldersPath);
+					var lsScratchPad = localStorage.getItem('scratchPad');
+					if (lsScratchPad)
+						V.scratchPad = lsScratchPad;
 
-					V.loadStudentData();
+					// V.loadStudentData()
+				},
+				loadHWDirs: function(){
+					axios({
+						method: 'post',
+						url: '/getDirectories',
+						data: {
+							parent: V.selectedCourse.dir+"/Grading"
+						}
+					}).then(function(resp){
+						console.log(resp);
+						V.hwDirs = resp.data.map(x => { return {name: x.split('/').pop(), dir: x }});
+					});
 				},
 				loadStudentData: function(){
+					var studentFoldersPath = V.hwPath+'/'+V.outputDir;
+					console.log(studentFoldersPath);
 					axios({
 						method: 'post',
 						url: '/loadStudentData',
 						data: {
-							dir: V.hwDir
+							dir: V.hwPath
 						}
 					}).then(function(resp){
 						console.log(resp);
-						if (resp.data !== ""){
-							console.log("Student Data Found")
+						if (resp.data !== "" && resp.data.length !== 0){
+							console.log("Student Data Found", resp.data)
 							V.students = resp.data;
 							V.selectStudent(V.students[0]);
 							V.loadEmailAddresses();
@@ -458,7 +559,8 @@
 				studentDataFromScratch: function(){
 					console.log("Building student data from scratch")
 					// get all directories in output
-					var studentFoldersPath = V.hwDir+'/'+V.outputDir;
+					var studentFoldersPath = V.hwPath+'/'+V.outputDir;
+					console.log(studentFoldersPath)
 					axios({
 						method: 'post',
 						url: '/ls',
@@ -467,6 +569,7 @@
 						}
 					}).then(function(resp){
 						var dirs = resp.data;
+						console.log(dirs);
 						//console.log("A")
 						dirs.forEach(function(dir){ // for each dir, create a student
 							//console.log("B")
@@ -483,7 +586,7 @@
 						})
 
 						// V.load();
-						// V.autoSave();
+						//V.autoSave();
 						// console.log("D")
 						V.selectStudent(V.students[0]);
 						// console.log("E")
@@ -505,7 +608,7 @@
 						method: 'post',
 						url: '/saveStudentData',
 						data: {
-							dir: V.hwDir,
+							dir: V.hwPath,
 							dat: JSON.stringify(reducedDat),
 						}
 					}).then(function(resp){
@@ -518,7 +621,7 @@
 						if (V.saving !== true){
 							V.save()
 						}
-					}, 2000);
+					}, 10000);
 					
 				},
 				loadEmailAddresses: function(){
@@ -526,7 +629,7 @@
 						method: 'post',
 						url: '/loadEmailAddresses',
 						data: {
-							dir: V.emailAddressPath
+							dir: V.selectedCourse.dir+"/Grading"
 						}
 					}).then(function(resp){
 						console.log(resp);
@@ -540,8 +643,15 @@
 								})
 								if (match)
 									match.emailAddress = line[1]
-								else
-									console.log("No email address found for "+line[0]);
+								else{
+									match = _.find(V.students, function(stu){
+										return stu.dir.split(" - ")[1] == line[0]
+									})
+									if (match)
+										match.emailAddress = line[1]
+									else
+										console.log("No email address found for "+line[0]);
+								}
 							}
 						}
 						else{
@@ -565,43 +675,18 @@
 					V.saveStudentData(function(){
 						V.saveRubricData(function(){
 							V.saving = false;
+							const d = new Date();
+							let text = d.toTimeString();
+							V.lastSaved = text.split(' ')[0]
 						});
 					})
-					// var dat = "";
-					// V.students.forEach(function(student){
-					// 	if (student.grade !== ''){
-					// 		var stuName = student.dir;
-					// 		if (V.namesNeedReformatting){
-					// 			stuName = V.reformatName(stuName);
-					// 		}
-
-					// 		dat += "!"+stuName+" "+student.grade+"\n";
-					// 		if (student.comments !== '')
-					// 			dat += student.comments+"\n"
-					// 		dat += "\n"
-					// 	}
-					// })
-
-					// axios({
-					// 	method: 'post',
-					// 	url: '/save',
-					// 	data: {
-					// 		dir: V.hwDir,
-					// 		dat: dat
-					// 	}
-					// }).then(function(resp){
-					// 	// console.log(resp)
-					// 	V.updateLS();
-					// 	V.saving = false;
-					// 	V.saved = true;
-					// })
 				},
 				load: function(){
 					axios({
 						method: 'post',
 						url: '/load',
 						data: {
-							dir: V.hwDir
+							dir: V.hwPath
 						}
 					}).then(function(resp){
 
@@ -651,11 +736,15 @@
 					location.reload();
 				},
 				updateLS: function(){
-					localStorage.setItem('hwDir', V.hwDir);
-					localStorage.setItem('emailAddressPath', V.emailAddressPath);
+					//localStorage.setItem('courses', JSON.stringify(V.courses))
+					//localStorage.setItem('selectedCourse', JSON.stringify(V.selectedCourse))
+					//localStorage.setItem('hwPath', V.hwPath);
+					//localStorage.setItem('hwDir', V.hwDir);
 					localStorage.setItem('namesNeedReformatting', JSON.stringify(V.namesNeedReformatting));
 					localStorage.setItem('additionalCode', V.additionalCode);
 					localStorage.setItem('pipedInput', V.fileInput);
+					localStorage.setItem('scratchPad', V.scratchPad);
+					localStorage.setItem('selectedCourseIdx', V.courses.indexOf(V.selectedCourse));
 				},
 				copyRunCommand: function(){
 					document.getElementById('runCommand').select();
@@ -669,6 +758,11 @@
 					if (ind >= V.students.length)
 						ind = 0;
 					V.selectStudent(V.students[ind])
+					setTimeout(function(){
+						document.querySelector('.selectedStudent').scrollIntoView({behavior: 'smooth', block: 'nearest', inline: 'start'});
+						//document.querySelector('.selectedStudent').scrollIntoView({behavior: 'smooth', block: 'end', inline: 'nearest'});
+					}, 100)
+					
 				},
 				prevStudent: function(){
 					var ind = _.findIndex(V.students, function(stu){
@@ -678,6 +772,10 @@
 					if (ind < 0)
 						ind = V.students.length-1;
 					V.selectStudent(V.students[ind])
+					setTimeout(function(){
+						document.querySelector('.selectedStudent').scrollIntoView({behavior: 'smooth', block: 'nearest', inline: 'start'});
+						//document.querySelector('.selectedStudent').scrollIntoView({behavior: 'smooth', block: 'end', inline: 'nearest'});
+					}, 100)
 				},
 				nextFile: function(){
 					var ind = _.findIndex(V.selectedStudent.files, function(file){
@@ -699,12 +797,12 @@
 				},
 				selectStudent: function(student){
 					console.log("SELECTING A STUDENT");
-					var stuPath = [V.hwDir, V.outputDir, student.dir].join('/');
+					var stuPath = [V.hwPath, V.outputDir, student.dir].join('/');
 
 
 					axios({
 						method: 'post',
-						url: '/ls',
+						url: '/lsr',
 						data: {
 							path: stuPath
 						}
@@ -715,10 +813,11 @@
 					})
 				},
 				selectFile: function(file){
+
 					console.log(file);
 					V.selectedStudent.selectedFile = file;
 					V.terminal = "";
-					V.runCommand = "python3 "+[this.hwDir, this.outputDir, this.selectedStudent.dir, this.selectedStudent.selectedFile.name].join('/').replace(' ', '\\ ');
+					V.runCommand = "python3 "+[this.hwPath, this.outputDir, this.selectedStudent.dir, this.selectedStudent.selectedFile.name].join('/').replace(' ', '\\ ');
 
 					if (V.fileInputs[this.selectedStudent.selectedFile.name] !== undefined){
 						V.fileInput = V.fileInputs[this.selectedStudent.selectedFile.name];
@@ -727,13 +826,36 @@
 						V.fileInput = ""
 					}
 
+					if (this.selectedStudent.selectedFile.raw){
+						var ta = document.getElementById('scriptEditor')
+						
+						if (this.cm !== null)
+							this.cm.toTextArea(document.getElementById('scriptEditor'))
+
+						ta.value = this.selectedStudent.selectedFile.raw;
+
+						
+
+						this.cm = CodeMirror.fromTextArea(document.getElementById('scriptEditor'), {
+							mode: 'text/plain',
+							lineNumbers: true,
+							lineWrapping: true
+						});
+
+						this.cm.on('change', function(cm) {
+							V.selectedStudent.selectedFile.raw = cm.getValue();
+						});
+					}
+
 					if (this.selectedStudent.selectedFile.name.split('.').pop() == 'py')
+						this.cm.setOption('mode', 'python')
 						if (V.autoRunMode)
-							V.runScriptWithLine()
-						else
-							V.runScript();
+							V.runEditedScript()
+						// else
+						// 	V.runScript();
 
 					V.previouslySelectedFile = this.selectedStudent.selectedFile.name;
+
 					V.$forceUpdate();
 				},
 				processFiles: function(studentPath, files, student){
@@ -839,8 +961,23 @@
 						return resp;
 					})
 				},
+				openTerminalAtDir: function(){
+					var scriptPath = [this.hwPath, this.outputDir, this.selectedStudent.dir].join('/')
+					// var scriptPath = [this.hwPath, this.outputDir, this.selectedStudent.dir, this.selectedStudent.selectedFile.name].join('/')
+					//.replace(' ', '\\ ');
+					axios({
+						method: 'post',
+						url: '/openTerminalAtDir',
+						data: {
+							path: scriptPath,
+							input: V.fileInput //.split(',').join('\n')
+						}
+					}).then(function(resp){
+
+					})
+				},
 				runScript: function(){
-					var scriptPath = [this.hwDir, this.outputDir, this.selectedStudent.dir, this.selectedStudent.selectedFile.name].join('/')//.replace(' ', '\\ ');
+					var scriptPath = [this.hwPath, this.outputDir, this.selectedStudent.dir, this.selectedStudent.selectedFile.name].join('/')//.replace(' ', '\\ ');
 					axios({
 						method: 'post',
 						url: '/runScript',
@@ -850,11 +987,13 @@
 						}
 					}).then(function(resp){
 						console.log(resp);
-						V.terminal = resp.data.join('\n').replace('\\n', '\n');
+						html = resp.data.join('\n').replace('\\n', '\n');
+						html = ansi_up.ansi_to_html(html);
+						V.terminal = html
 					})
 				},
 				runScriptWithLine: function(){
-					var scriptPath = [this.hwDir, this.outputDir, this.selectedStudent.dir, this.selectedStudent.selectedFile.name].join('/')//.replace(' ', '\\ ');
+					var scriptPath = [this.hwPath, this.outputDir, this.selectedStudent.dir, this.selectedStudent.selectedFile.name].join('/')//.replace(' ', '\\ ');
 					axios({
 						method: 'post',
 						url: '/runScriptWithLine',
@@ -865,22 +1004,30 @@
 						}
 					}).then(function(resp){
 						console.log(resp);
-						V.terminal = resp.data.join('\n').replace('\\n', '\n');
+						html = resp.data.join('\n').replace('\\n', '\n');
+						html = ansi_up.ansi_to_html(html);
+						V.terminal = html
 					})
 				},
 				runEditedScript: function(){
-					var scriptPath = [this.hwDir, this.outputDir, this.selectedStudent.dir, this.selectedStudent.selectedFile.name].join('/')//.replace(' ', '\\ ');
+					if (this.selectedStudent.selectedFile.name.indexOf('.txt') !== -1)
+						return;
+					var scriptPath = [this.hwPath, this.outputDir, this.selectedStudent.dir, this.selectedStudent.selectedFile.name].join('/')//.replace(' ', '\\ ');
 					axios({
 						method: 'post',
 						url: '/runEditedScript',
 						data: {
 							path: scriptPath,
 							input: V.fileInput.split(',').join('\n'),
-							code: V.selectedStudent.selectedFile.raw
+							code: V.selectedStudent.selectedFile.raw,
+							line: V.additionalCode,
+							testingSuite: V.testingSuite
 						}
 					}).then(function(resp){
 						console.log(resp);
-						V.terminal = resp.data.join('\n').replace('\\n', '\n');
+						html = resp.data.join('\n').replace('\\n', '\n');
+						html = ansi_up.ansi_to_html(html);
+						V.terminal = html
 					})
 				},
 				makeGradeFile: function(){
@@ -888,7 +1035,7 @@
 						method: 'post',
 						url: '/makeGradeFile',
 						data: {
-							path: V.hwDir,
+							path: V.hwPath,
 						}
 					}).then(function(resp){
 						console.log(resp); // TODO Doesn't catch errors.
@@ -900,7 +1047,7 @@
 						method: 'post',
 						url: '/copyCommonFiles',
 						data: {
-							path: V.hwDir,
+							path: V.hwPath,
 						}
 					}).then(function(resp){
 						console.log(resp);
@@ -911,7 +1058,7 @@
 						method: 'post',
 						url: '/runGraderOnAll',
 						data: {
-							path: V.hwDir,
+							path: V.hwPath,
 						}
 					}).then(function(resp){
 						console.log(resp);
@@ -970,7 +1117,7 @@
 						method: 'post',
 						url: '/saveRubricData',
 						data: {
-							dir: V.hwDir,
+							dir: V.hwPath,
 							dat: JSON.stringify(V.rubric),
 						}
 					}).then(function(resp){
@@ -983,7 +1130,7 @@
 						method: 'post',
 						url: '/loadRubricData',
 						data: {
-							dir: V.hwDir
+							dir: V.hwPath
 						}
 					}).then(function(resp){
 						console.log(resp)
@@ -994,6 +1141,8 @@
 								V.selectedRubricCatID = _.keys(V.rubric)[0]
 							}
 						}
+
+						V.autoSave(); // not the best place for this
 
 						if (callback)
 							callback();
@@ -1056,7 +1205,11 @@
 					}).length;
 				},
 				makeGradeWorksheet: function(callback){
-					var dat = [['Identifier', 'Full Name', 'Email Address', 'Grade', 'Feedback']]
+					var dat = [['Identifier', 'Full Name', 'Email Address', 'Grade']] //, 'Feedback']]
+
+					var fob = {}
+
+					var converter = new showdown.Converter();
 
 					V.students.forEach(function(student){
 
@@ -1067,7 +1220,7 @@
 						//var emailAddress = nameAr[0][0]+nameAr[nameAr.length-1]+"@colgate.edu";
 						var emailAddress = student.emailAddress;
 
-						var autoFeedback = ""
+						var autoFeedback = `# Feedback for ${V.hwDir}\n## ${fullName}\n`
 
 						var grade = 0;
 
@@ -1077,30 +1230,45 @@
 							var catGrade = parseFloat(rubObj.points);
 							var cat = student.rubric[cid];
 
+							if (cat.items.length > 0){
+								autoFeedback += `### ${rubObj.name}\n`
+							}
+							var c = 0;
 							cat.items.forEach(function(itemID){
 
 								var itemObj = rubObj.items[itemID]
 								catGrade += parseFloat(itemObj.points)
 								if (parseFloat(itemObj.points) < 0){
-									autoFeedback += `${rubObj.name}: ${itemObj.points} pts for ${itemObj.desc}.  \n`;
+									autoFeedback += `- ${itemObj.points} pts for ${itemObj.desc}\n\n`;
+									c += 1
 								}
 							})
+
+							if (c == 0){
+								autoFeedback += `- No points deducted. Good job!\n\n`
+							}
 
 							grade += catGrade;
 
 							if (cat.comments && cat.comments !== ""){
-								autoFeedback += `${rubObj.name}: ${cat.comments}  \n`;
+								autoFeedback += `<b>Overall feedback for ${rubObj.name}:</b> ${cat.comments}\n\n`;
 							}
 
 						})
 
 						grade += parseFloat(student.gradeAdjustment);
 						if (student.comments !== "")
-							var comments = autoFeedback+"Additional Comments: "+student.comments;
+							var comments = autoFeedback+"<h3>Additional General Comments:</h3> "+student.comments;
 						else
 							var comments = autoFeedback;
 
-						dat.push([identifier, fullName, emailAddress, grade, comments])
+						var html = converter.makeHtml(comments);
+						var style = `body{
+							padding: 2em;
+						}`
+						fob[student.dir] = `<html><style type="text/css">${style}</style><body>${html}<h2>Grade: ${grade}/100</h2></body></html>`;
+
+						dat.push([identifier, fullName, emailAddress, grade]) //, comments])
 					})
 
 					console.log(dat);
@@ -1111,14 +1279,48 @@
 						method: 'post',
 						url: '/makeGradeWorksheet',
 						data: {
-							dir: V.hwDir,
+							dir: V.hwPath,
 							dat: dat,
+							fob: fob
 						}
 					}).then(function(resp){
 						console.log(resp);
 						if (callback)
 							callback();
 					})
+				},
+
+				addNewCourse: function(){
+					V.courses.push({
+						name: V.newCourse.name,
+						dir: V.newCourse.dir,
+					})
+					V.newCourse = {name: '', dir: ''}
+					localStorage.setItem('courses', JSON.stringify(V.courses))
+				},
+
+				drawGradeChart: function(){
+					var x = V.students.map(s => { return V.studentGrade(s) })
+					var trace = {
+					    x: x,
+					    type: 'histogram',
+					    // xbins: {
+					    // 	end: 100,
+					    // 	start: 0,
+					    // 	size: 10
+					    // }
+					  };
+					var layout = {
+						// margin: {t: 10, b: 10, l: 10, r: 10}
+					}
+					var data = [trace];
+					Plotly.newPlot('gradeChart', data, layout);
+
+				},
+				fullCredit: function(){
+					for (let key in V.selectedStudent.rubric){
+
+					}
 				},
 
 				// UTILITIES
@@ -1161,6 +1363,18 @@
 		        }
 		    }
 		};
+
+		function isScrolledIntoView(el) {
+		    var rect = el.getBoundingClientRect();
+		    var elemTop = rect.top;
+		    var elemBottom = rect.bottom;
+
+		    // Only completely visible elements return true:
+		    var isVisible = (elemTop >= 0) && (elemBottom <= window.innerHeight);
+		    // Partially visible elements return true:
+		    //isVisible = elemTop < window.innerHeight && elemBottom >= 0;
+		    return isVisible;
+		}
 				
 
 

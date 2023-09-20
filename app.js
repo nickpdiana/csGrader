@@ -1,6 +1,7 @@
 const express = require('express')
+const zip = require('zip-a-folder')
 const app = express()
-const port = 3000
+const port = 3101
 
 const open = require('open');
 const path = require('path');
@@ -10,11 +11,12 @@ const rtfToHTML = require('@iarna/rtf-to-html')
 var textract = require('textract');
 var stringify = require('csv-stringify');
 const mammoth = require('mammoth');
+var walk = require('walk');
 // const childProcess = require('child_process')
 // const { spawn } = childProcess.spawn;
 // const { spawnSync } = childProcess.spawnSync;
 
-const { spawn, spawnSync } = require('child_process');
+const { spawn, spawnSync, exec } = require('child_process');
 
 app.use(express.static('.'))
 
@@ -36,6 +38,7 @@ function save(req, res, file, dat){
 
 function load(req, res, file){
 	fs.readFile(req.body.dir+'/'+file, function(err, data){
+			if (err) console.log(err);
 			res.send(data);
 	})
 }
@@ -56,6 +59,22 @@ app.post('/load', function(req, res){
 		else
 			res.send(data);
 	})
+})
+
+app.post('/getDirectories', function(req, res){
+	var dirPath = req.body.parent+'/';
+	var result = []; //this is going to contain paths
+
+	// fs.readdir(__dirname + dirPath, function (err, filesPath) {
+	fs.readdir(dirPath, function (err, filesPath) {
+	    if (err) throw err;
+	    result = filesPath.map(function (filePath) {
+	        return dirPath + filePath;
+	    }).filter(x => { return x.split('/').pop()[0] !== '.' }).filter(x => {
+	    	return fs.lstatSync(x).isDirectory()
+	    });
+	    res.send(result)
+	});
 })
 
 app.post('/saveRubricData', function(req, res){
@@ -86,7 +105,13 @@ app.post('/highlightFile', function(req, res){
 	});
 })
 
+app.post('/openTerminalAtDir', function(req, res){
+	console.log(req.body.path)
+	exec('open -a Terminal ' + '"'+req.body.path+'"');
+})
+
 app.post('/processFiles', async function(req, res){
+	console.log("Processing Files")
 	var rar = []
 	directoryPath = req.body.path;
 	console.log(directoryPath);
@@ -122,6 +147,7 @@ app.post('/processFiles', async function(req, res){
 			})
 			o.type = 'html'
 			o.html = ret;
+			o.raw = ret;
 		}
 		if (ext === 'txt'){
 			var ret = await fs.promises.readFile(directoryPath+"/"+file, 'utf8', function(err, data) {
@@ -129,6 +155,23 @@ app.post('/processFiles', async function(req, res){
 			})
 			o.type = 'txt'
 			o.html = '<pre>'+ret+'</pre>';
+			o.raw = ret;
+		}
+		if (file.indexOf('_textresponse') !== -1){
+			var ret = await fs.promises.readFile(directoryPath+"/"+file, 'utf8', function(err, data) {
+				if (err) throw err;
+			})
+
+			var questionText = file.split('/');
+			questionText.pop()
+			questionText.push('Question text')
+			questionText = questionText.join('/')
+			var ret2 = await fs.promises.readFile(directoryPath+"/"+questionText, 'utf8', function(err, data) {
+				if (err) throw err;
+			})
+			o.type = 'txt'
+			o.html = `<div class='saQuestion'><div class="questionText">${ret2}</div><div class="textResponse">${ret}</div></div>`;
+			o.raw = ret;
 		}
 		if (ext === 'rtf'){
 			// var ret = await fs.promises.readFile(directoryPath+"/"+file, 'utf8', function(err, data) {
@@ -152,6 +195,7 @@ app.post('/processFiles', async function(req, res){
 			// });
 			o.type = 'txt'
 			o.html = '<pre>'+ret+'</pre>';
+			o.raw = ret;
 			// o.type = 'txt'
 			// o.html = '<pre>'+convertToPlain(ret);+'</pre>'
 		}
@@ -161,8 +205,10 @@ app.post('/processFiles', async function(req, res){
 				var destPath = 'tmp.pdf'
 				// fs.copyFileSync(srcPath, destPath);
 
-				if (fs.existsSync('stuDir'))
+				//if (fs.existsSync('stuDir')){
+					//console.log('stuDir exists')
 					fs.unlinkSync('stuDir')
+				//}
 				fs.symlinkSync(directoryPath, 'stuDir', 'dir')
 
 				o.type = "html"
@@ -252,6 +298,28 @@ app.post('/ls', function(req, res){
 	// res.send(JSON.stringify(rar));
 });
 
+app.post('/lsr', function(req, res){
+
+	var files = [];
+
+	// Walker options
+	var directoryPath = req.body.path;
+	var walker  = walk.walk(directoryPath, { followLinks: false });
+
+	walker.on('file', function(root, stat, next) {
+	    // Add this file to the list of files
+	    var fullName = root + '/' + stat.name
+	    files.push(fullName.replace(directoryPath, ''));
+	    next();
+	});
+
+	walker.on('end', function() {
+	    console.log(files);
+	    res.send(files);
+	});
+
+})
+
 function runScriptWithInput(req, res, input){
 	return new Promise(function(resolve, reject){
 		const ls = spawn("python3", [req.body.path], {cwd: path.dirname(req.body.path)});
@@ -260,27 +328,67 @@ function runScriptWithInput(req, res, input){
 		console.log(`Running ${req.body.path} with piped input`);
 		console.log('------------------------------------')
 
-		ls.stdin.write(input);
-		ls.stdin.end();
+		ls.stdin.on("data", function(data) { // Doesn't work
+			console.log("recieved " + data)
+			ret.push(`\u001b[35m${data}\u001b[0m`)
+		});
 
+		
+
+		
+		// console.log("inp")
+		// console.log(inpAr)
 		var ret = [];
+		var stderr = [];
+		var err = [];
+
 		ls.stdout.on("data", data => {
 		    console.log(`${data}`);
-		    ret.push(`${data}`);
+		    // let i = inpAr[ret.length]
+		    // console.log("hello", i)
+		    // ret.push(`${data} ${i}`);
+		    ret.push(`${data}`)
 		});
 
 		ls.stderr.on("data", data => {
 		    console.log(`stderr: ${data}`);
+		    ret.push(`\u001b[41m${data}\u001b[0m`)
 		});
 
 		ls.on('error', (error) => {
 		    console.log(`error: ${error.message}`);
+		    ret.push(`\u001b[41m${error}\u001b[0m`)
 		});
 
 		ls.on("close", code => {
 		    console.log(`child process exited with code ${code}`);
+		    ls.stdin.end();
+		    if (stdInt) clearInterval(stdInt)
+		    // resolve({stdout: ret.join('\n'), stderr: stderr.join('\n'), err: err.join('\n')});
 		    resolve(ret.join('\n'));
 		});
+
+		var inpAr = input.split('\n')
+		var i = 0
+		var stdInt = setInterval(function(){
+			console.log(i, inpAr[i])
+			ls.stdin.write(inpAr[i]+'\n');
+			ret[ret.length-1] += `\u001b[36m${inpAr[i]}\u001b[0m`
+			i++
+			if (i >= inpAr.length){
+				ls.stdin.end();
+				clearInterval(stdInt)
+			}
+
+		}, 50)
+
+		// var inpAr = input.split('\n')
+		// for (var i = 0; i < inpAr.length; i++) {
+		// 	ls.stdin.write(inpAr[i]+'\n');
+		// 	ret.push(`\u001b[35m${inpAr[i]}\u001b[0m`)
+		// }
+
+		// ls.stdin.write(input);
 	})
 }
 
@@ -296,13 +404,6 @@ app.post('/runScript', async function(req, res){
 		var ret = await runScriptWithInput(req, res, inp);
 		aggRet.push(ret);
 	}
-
-	// runs.forEach(function(run){
-	// 	var inp = run.split(',').join('\n');
-	// 	console.log("Running script with:\n"+inp)
-	// 	var ret = runScriptWithInput(req, res, inp);
-	// 	aggRet.push(ret)
-	// })
 
 	console.log("AggRet:")
 	console.log(aggRet)
@@ -349,40 +450,68 @@ app.post('/runScriptWithLine', function(req, res){
 });
 
 
-app.post('/runEditedScript', function(req, res){
+app.post('/runEditedScript', async function(req, res){
 	var newPath = req.body.path+"_temp.py";
 
 	console.log('')
 	console.log(`Running ${newPath} with piped input`);
 	console.log('------------------------------------')
 
-	fs.writeFile(newPath, req.body.code, function(err){
+	var tests = '';
+	if (req.body.testingSuite === true){
+		tests = fs.readFileSync('./testingSuite.py', {encoding:'utf8', flag:'r'});
+	}
 
-		const ls = spawn("python3", [newPath], {cwd: path.dirname(req.body.path)});
+	var newFileData = req.body.code+'\n'+tests+'\n'+req.body.line;
 
-		ls.stdin.write(req.body.input);
-		ls.stdin.end();
+	fs.writeFile(newPath, newFileData, async function(err){
 
-		var ret = [];
-		ls.stdout.on("data", data => {
-		    console.log(`${data}`);
-		    ret.push(`${data}`);
-		});
+		var aggRet = []
+		var runs = req.body.input.split(';')
+		let promises = [];
 
-		ls.stderr.on("data", data => {
-		    console.log(`stderr: ${data}`);
-		});
+		for (let i=0; i<runs.length; i++){
+			var inp = runs[i].split(',').join('\n');
+			console.log("Running script with:\n"+inp)
 
-		ls.on('error', (error) => {
-		    console.log(`error: ${error.message}`);
-		});
+			var modReq = {...req}
+			modReq.body.path = newPath;
 
-		ls.on("close", code => {
-		    console.log(`child process exited with code ${code}`);
-		    fs.unlinkSync(newPath);
-		    console.log(`Temporary file ${newPath} deleted`);
-		    res.send(ret);
-		});
+			var ret = await runScriptWithInput(req, res, inp);
+			aggRet.push(ret);
+		}
+
+		console.log("AggRet:")
+		console.log(aggRet)
+		fs.unlinkSync(newPath);
+		console.log(`Temporary file ${newPath} deleted`);
+		res.send(aggRet);
+
+		// const ls = spawn("python3", [newPath], {cwd: path.dirname(req.body.path)});
+
+		// ls.stdin.write(req.body.input);
+		// ls.stdin.end();
+
+		// var ret = [];
+		// ls.stdout.on("data", data => {
+		//     console.log(`${data}`);
+		//     ret.push(`${data}`);
+		// });
+
+		// ls.stderr.on("data", data => {
+		//     console.log(`stderr: ${data}`);
+		// });
+
+		// ls.on('error', (error) => {
+		//     console.log(`error: ${error.message}`);
+		// });
+
+		// ls.on("close", code => {
+		//     console.log(`child process exited with code ${code}`);
+		//     fs.unlinkSync(newPath);
+		//     console.log(`Temporary file ${newPath} deleted`);
+		//     res.send(ret);
+		// });
 
 	})
 });
@@ -390,6 +519,7 @@ app.post('/runEditedScript', function(req, res){
 app.post('/runGraderOnAll', function(req, res){
 
 	var directoryPath = req.body.path;
+	console.log(directoryPath)
 
 	var rar = []
 
@@ -411,9 +541,30 @@ app.post('/runGraderOnAll', function(req, res){
 
 });
 
-app.post('/makeGradeWorksheet', function(req, res){
+app.post('/makeGradeWorksheet', async function(req, res){
 	var hwDirPath = req.body.dir;
 	console.log(hwDirPath);
+
+	var directoryPath = req.body.dir;
+
+	var rar = []
+
+	var dirs = fs.readdirSync(directoryPath+'/output', { withFileTypes: true })
+	    .filter(dirent => dirent.isDirectory())
+	    .map(dirent => dirent.name)
+
+  //if (!fs.existsSync(directoryPath+'/feedback')){
+	fs.mkdirSync(directoryPath+'/feedback', { recursive: true });
+  //}
+	dirs.forEach(function(dir){
+		//if (!fs.existsSync(directoryPath+'/feedback'+dir)){
+		fs.mkdirSync(directoryPath+'/feedback/'+dir, { recursive: true })
+		//}
+		var newFile = directoryPath+'/feedback/'+dir+'/feedback.html';
+		fs.writeFileSync(newFile, req.body.fob[dir]);
+	})
+
+	await zip.zip(directoryPath+'/feedback', directoryPath+'/feedback.zip');
 
 	stringify(req.body.dat, function(err, output) {
 	  fs.writeFile(req.body.dir+'/gradeWorksheet.csv', output, 'utf8', function(err) {
@@ -475,7 +626,7 @@ app.post('/copyCommonFiles', function(req, res){
 		// 	fs.copyFileSync(srcPath, destPath);
 		// })
 
-		var source = req.body.path+'copy';
+		var source = req.body.path+'/copy';
 		var destination = directoryPath+'/output/'+destDir;
 		try {
 			fs.copySync(source, destination)
