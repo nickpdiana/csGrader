@@ -1,6 +1,11 @@
 # 101 Grader
 
-![screenshot of the grader](screenshot.png)
+## To Do
+
+1. Need to allow user to specify path to courses directory
+2. Should give errors when: no output, no emailAddresses.csv
+3. Auto convert Moodle grade sheet to emailAddresses.csv
+4. Style auto run toggle
 
 ## Purpose
 Navigate, edit, run, and grade files for COSC101 in one window and without having to leave the keyboard.
